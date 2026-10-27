@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portal Risk Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: control-room board. Navy masthead with the audit-phase rail, KPI strip, heat map beside the risk register, remediation tracker beside the live activity log. */
+:root {
+  --font-display: "Source Serif 4", Cambria, Georgia, serif;
+  --font-body: "IBM Plex Sans", Calibri, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+
+  --bg: #F3F5F8; --surface: #FFFFFF; --surface-2: #EDF0F5; --ink: #18212F; --muted: #5A6779; --line: #D9DFE8;
+  --accent: #0B1F3A; --accent-ink: #FFFFFF; --focus: #1F5FA8;
+  --gold: #C9A227; --gold-ink: #7A5E0E; --gold-soft: #FBF3D9; --gold-line: #E9D18A;
+  --mast: #0B1F3A; --mast-ink: #FFFFFF; --mast-muted: #B4C0D2; --mast-line: rgba(255,255,255,.16); --mast-chip: rgba(255,255,255,.06); --mast-gold: #E2BE4A; --mast-gold-ink: #0B1F3A;
+  --low: #2E8B57; --on-low: #FFFFFF; --low-soft: #DDEFE4; --low-ink: #1F6B41;
+  --med: #F0C02F; --on-med: #1B2433; --med-soft: #FCF1CC; --med-ink: #7A5E0E;
+  --high: #E8833A; --on-high: #1B2433; --high-soft: #FBE5D3; --high-ink: #9A4A12;
+  --crit: #C0392B; --on-crit: #FFFFFF; --crit-soft: #F7DCD8; --crit-ink: #9B2B20;
+  --info: #1F5FA8; --info-soft: #DCE8F6;
+  --chip-bg: #0B1F3A; --chip-ink: #FFFFFF;
+  --live: #2FB36F;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1220; --surface: #121C2C; --surface-2: #1A2638; --ink: #E7ECF3; --muted: #9AA8BB; --line: #26344A;
+    --accent: #E2BE4A; --accent-ink: #0B1F3A; --focus: #7FB0EA;
+    --gold-ink: #E9C95E; --gold-soft: #2A2614; --gold-line: #5C4C17;
+    --mast: #060D19; --mast-muted: #9AA8BB;
+    --low: #3AA76B; --low-soft: #16301F; --low-ink: #7FD3A2;
+    --med: #E9B825; --med-soft: #30290F; --med-ink: #F0CF6A;
+    --high: #E8833A; --high-soft: #33210F; --high-ink: #F2A86E;
+    --crit: #D2483A; --crit-soft: #3A1715; --crit-ink: #F09A90;
+    --info: #7FB0EA; --info-soft: #14263F;
+    --chip-bg: #F1F4F8; --chip-ink: #0B1F3A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1220; --surface: #121C2C; --surface-2: #1A2638; --ink: #E7ECF3; --muted: #9AA8BB; --line: #26344A;
+  --accent: #E2BE4A; --accent-ink: #0B1F3A; --focus: #7FB0EA;
+  --gold-ink: #E9C95E; --gold-soft: #2A2614; --gold-line: #5C4C17;
+  --mast: #060D19; --mast-muted: #9AA8BB;
+  --low: #3AA76B; --low-soft: #16301F; --low-ink: #7FD3A2;
+  --med: #E9B825; --med-soft: #30290F; --med-ink: #F0CF6A;
+  --high: #E8833A; --high-soft: #33210F; --high-ink: #F2A86E;
+  --crit: #D2483A; --crit-soft: #3A1715; --crit-ink: #F09A90;
+  --info: #7FB0EA; --info-soft: #14263F;
+  --chip-bg: #F1F4F8; --chip-ink: #0B1F3A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+h1, h2 { text-wrap: balance; }
+
+.wrap {
+  max-width: 1280px; margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Masthead */
+.mast { background: var(--mast); color: var(--mast-ink); border-bottom: 1px solid var(--line); }
+.mast-in { display: flex; flex-wrap: wrap; gap: 16px 32px; justify-content: space-between; align-items: flex-end; padding-block: 22px 16px; }
+.brand { min-width: 0; }
+.eyebrow { font: 600 11px/1.3 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--mast-gold); }
+h1 { font: 700 clamp(26px, 4vw, 36px)/1.1 var(--font-display); margin: 6px 0 4px; }
+.sub { margin: 0; color: var(--mast-muted); font-size: 14px; }
+.mast-side { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.live { display: flex; align-items: center; gap: 8px; font: 500 13px var(--font-mono); color: var(--mast-muted); font-variant-numeric: tabular-nums; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 2s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--live); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+.phase-row { padding-block: 0 18px; display: grid; gap: 8px; }
+.phase-label { font: 600 11px var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--mast-muted); }
+.phase { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.phase button {
+  flex: 1 0 auto; display: flex; align-items: center; gap: 8px; text-align: left;
+  font: 500 13px/1.2 var(--font-body); color: var(--mast-muted);
+  background: var(--mast-chip); border: 1px solid var(--mast-line); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+}
+.phase button .n { font: 600 12px var(--font-mono); }
+.phase button.done { color: var(--mast-ink); }
+.phase button.done .n { color: var(--mast-gold); }
+.phase button.current { background: var(--mast-gold); color: var(--mast-gold-ink); border-color: var(--mast-gold); font-weight: 600; }
+.phase-desc { margin: 0; font-size: 13.5px; color: var(--mast-muted); }
+
+.btn { font: 600 14px var(--font-body); border-radius: 8px; padding: 8px 14px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.quiet { background: transparent; border-color: var(--line); color: var(--ink); }
+.btn.on-mast { background: transparent; border-color: var(--mast-line); color: var(--mast-ink); }
+.btn.on-mast.armed { background: var(--crit); border-color: var(--crit); color: var(--on-crit); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.danger { background: var(--crit); color: var(--on-crit); }
+
+.notice { margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; background: var(--gold-soft); border: 1px solid var(--gold-line); font-size: 13.5px; }
+.notice strong { color: var(--gold-ink); }
+
+main.wrap { display: grid; gap: 20px; padding-block: 20px 8px; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.kpi .label { display: flex; align-items: center; gap: 7px; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.kpi .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--x, var(--muted)); flex: none; }
+.kpi .val { font: 700 32px/1.05 var(--font-display); font-variant-numeric: tabular-nums; }
+.kpi .note { font-size: 12.5px; color: var(--muted); }
+.kpi .bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: flex; margin-top: 4px; }
+.kpi .bar span { display: block; height: 100%; }
+
+/* Panels */
+.grid-a { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.grid-b { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 5fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .grid-a, .grid-b { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; display: grid; gap: 14px; align-content: start; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+h2 { font: 700 19px/1.2 var(--font-display); margin: 0; }
+.hint { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* Heat map */
+.matrix { display: grid; grid-template-columns: 22px 20px repeat(5, minmax(0, 1fr)); gap: 4px; max-width: 460px; }
+.ytitle { grid-row: 1 / span 5; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; align-self: center; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.xtitle { grid-column: 3 / -1; text-align: center; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.axn { display: grid; place-items: center; font: 600 13px var(--font-mono); color: var(--muted); }
+.cell {
+  aspect-ratio: 1; max-width: 100%; min-width: 0; border: 0; border-radius: 6px; padding: 5px; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 2px;
+  font: inherit; background: var(--soft); color: var(--ink); transition: transform .12s ease;
+}
+.cell.has { background: var(--x); color: var(--on-x); }
+.cell:hover { transform: scale(1.04); }
+.cell.sel { outline: 3px solid var(--ink); outline-offset: 2px; }
+.cell .s { font: 600 12px var(--font-mono); opacity: .9; }
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.rid { font: 600 11px/1.5 var(--font-mono); background: var(--chip-bg); color: var(--chip-ink); border-radius: 999px; padding: 0 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend span { font: 600 12px var(--font-body); padding: 3px 10px; border-radius: 999px; background: var(--x); color: var(--on-x); }
+.dist { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-2); }
+.dist span { display: block; height: 100%; background: var(--x); transition: flex-grow .3s ease; }
+.dist-labels { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.dist-labels b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Bands */
+.b-crit { --x: var(--crit); --on-x: var(--on-crit); --soft: var(--crit-soft); }
+.b-high { --x: var(--high); --on-x: var(--on-high); --soft: var(--high-soft); }
+.b-med  { --x: var(--med);  --on-x: var(--on-med);  --soft: var(--med-soft); }
+.b-low  { --x: var(--low);  --on-x: var(--on-low);  --soft: var(--low-soft); }
+
+/* Register */
+.filter-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-soft); color: var(--ink); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 14px; }
+th { background: var(--surface-2); text-align: left; font: 600 11.5px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px; white-space: nowrap; }
+td { padding: 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+tr.top td { background: var(--gold-soft); }
+td.id { font: 600 14px var(--font-mono); }
+.scen { min-width: 230px; }
+.scen strong { display: block; font-weight: 600; }
+.scen small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.score { font: 600 15px var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.score small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--font-body); background: var(--x); color: var(--on-x); white-space: nowrap; }
+.st { display: inline-flex; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--font-body); white-space: nowrap; border: 1px solid transparent; }
+.st-open { border-color: var(--line); color: var(--muted); }
+.st-treat { background: var(--info-soft); color: var(--info); }
+.st-impl { background: var(--gold-soft); color: var(--gold-ink); }
+.st-ver { background: var(--low-soft); color: var(--low-ink); }
+.del-wrap { display: flex; gap: 6px; justify-content: flex-end; }
+.icon-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 500 12.5px var(--font-body); }
+
+/* Add form */
+.add-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; background: var(--surface-2); padding: 14px; border-radius: 10px; }
+.add-form label { display: grid; gap: 4px; font: 600 12px var(--font-body); color: var(--muted); min-width: 0; }
+.add-form input[type="text"], .add-form select { font: 400 14px var(--font-body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); width: 100%; }
+.add-form input[type="range"] { width: 100%; accent-color: var(--accent); }
+.add-form .wide { grid-column: 1 / -1; }
+.rangeval { font: 600 13px var(--font-mono); color: var(--ink); }
+.preview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.preview .score { font-size: 16px; }
+.form-err { color: var(--crit-ink); font-size: 13px; margin: 0; }
+
+/* Tracker */
+.progress { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: flex; }
+.progress span { display: block; height: 100%; transition: width .3s ease; }
+.prog-text { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13.5px; color: var(--muted); }
+.prog-text b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.action { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.action .title { font-weight: 600; }
+.action .meta { font-size: 12.5px; color: var(--muted); }
+.prio { font: 600 11.5px var(--font-mono); text-align: center; padding: 3px 6px; border-radius: 6px; }
+.prio-P1 { background: var(--crit-soft); color: var(--crit-ink); }
+.prio-P2 { background: var(--high-soft); color: var(--high-ink); }
+.prio-Ongoing { background: var(--surface-2); color: var(--muted); }
+.action select { font: 500 13.5px var(--font-body); padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.action.s-Verified { border-color: var(--low); }
+.action.s-Done { border-color: var(--gold-line); }
+@media (max-width: 560px) {
+  .action { grid-template-columns: 64px minmax(0, 1fr); }
+  .action select { grid-column: 1 / -1; }
+}
+
+/* Log */
+.log { list-style: none; margin: 0; padding: 0; max-height: 470px; overflow: auto; }
+.log li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.log li:first-child { border-top: 0; }
+.log time { font: 500 12.5px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.log li.fresh { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: var(--gold-soft); } to { background: transparent; } }
+
+.foot { padding-block: 8px 28px; color: var(--muted); font-size: 12.5px; display: grid; gap: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dot, .log li.fresh { animation: none; }
+  .cell, .dist span, .progress span { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap mast-in">
+    <div class="brand">
+      <div class="eyebrow">21CSC308T · Security Risk Management Principles</div>
+      <h1>Student Portal Risk Dashboard</h1>
+      <p class="sub">Hypothetical case study · Yatin Annam · RA2411030010101 · Section X1</p>
+    </div>
+    <div class="mast-side">
+      <div class="live"><span class="dot" aria-hidden="true"></span><span>Live session</span><time id="clock"></time></div>
+      <button type="button" class="btn on-mast" id="resetBtn">Reset demo data</button>
+    </div>
+  </div>
+  <div class="wrap phase-row">
+    <div class="phase-label">Audit phase</div>
+    <div class="phase" id="phase" role="group" aria-label="Audit phase"></div>
+    <p class="phase-desc" id="phaseDesc"></p>
+  </div>
+</header>
+
+<div class="wrap">
+  <p class="notice"><strong>Hypothetical data.</strong> All risks, scores and actions are illustrative examples for a generic college portal. No real SRM system was accessed, tested or assessed.</p>
+</div>
+
+<main class="wrap">
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <section class="grid-a">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Risk heat map</h2>
+      </div>
+      <p class="hint">Likelihood × impact, 1 to 5 each. Click a cell to filter the register.</p>
+      <div class="matrix" id="matrix"></div>
+      <div class="legend">
+        <span class="b-low">Low 1–4</span><span class="b-med">Medium 5–9</span><span class="b-high">High 10–15</span><span class="b-crit">Critical 16–25</span>
+      </div>
+      <div>
+        <div class="dist" id="dist" aria-hidden="true"></div>
+      </div>
+      <div class="dist-labels" id="distLabels"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Risk register</h2>
+        <button type="button" class="btn primary" id="addToggle" aria-expanded="false" aria-controls="addForm">Add risk</button>
+      </div>
+      <form class="add-form" id="addForm" hidden novalidate>
+        <label class="wide" for="fScenario">Risk scenario
+          <input type="text" id="fScenario" placeholder="e.g. Session not ended after logout on shared lab PCs" maxlength="120">
+        </label>
+        <label for="fAsset">Affected asset
+          <select id="fAsset"></select>
+        </label>
+        <label for="fOwner">Risk owner
+          <select id="fOwner"></select>
+        </label>
+        <label for="fThreat">Threat
+          <input type="text" id="fThreat" placeholder="e.g. Unauthorized person at a shared PC" maxlength="80">
+        </label>
+        <label for="fVuln">Vulnerability
+          <input type="text" id="fVuln" placeholder="e.g. No session timeout" maxlength="80">
+        </label>
+        <label for="fL">Likelihood <span class="rangeval" id="fLv">3</span>
+          <input type="range" id="fL" min="1" max="5" value="3">
+        </label>
+        <label for="fI">Impact <span class="rangeval" id="fIv">3</span>
+          <input type="range" id="fI" min="1" max="5" value="3">
+        </label>
+        <div class="preview" id="fPreview"></div>
+        <p class="form-err wide" id="fErr" hidden>Enter a risk scenario before adding.</p>
+        <div class="preview">
+          <button type="submit" class="btn primary">Add to register</button>
+          <button type="button" class="btn quiet" id="addCancel">Cancel</button>
+        </div>
+      </form>
+      <div class="filter-note" id="filterNote" hidden></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Scenario</th><th>Likelihood</th><th>Impact</th><th>Score</th><th>Rating</th><th>Status</th><th><span hidden>Remove</span></th></tr>
+          </thead>
+          <tbody id="regBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-b">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Remediation tracker</h2>
+      </div>
+      <p class="hint">A risk counts as treated only after every linked action is verified with evidence.</p>
+      <div class="progress" id="progress" aria-hidden="true"></div>
+      <div class="prog-text" id="progText"></div>
+      <ul class="actions" id="actions"></ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Activity log</h2>
+        <span class="hint" id="logCount"></span>
+      </div>
+      <ul class="log" id="log" aria-live="polite"></ul>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <div>Method: risk score = likelihood × impact. Bands are example values: Low 1–4, Medium 5–9, High 10–15, Critical 16–25.</div>
+  <div>References: NIST SP 800-30 Rev. 1 · ISO/IEC 27001:2022 · ISO/IEC 27005:2022 · NIST SP 800-53 Rev. 5 · OWASP Top 10:2025.</div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "srmp-portal-risk-dashboard-v1";
+  var PHASES = [
+    ["Pre-planning and scope", "Sponsor approves the scope: portal, authentication, database, admin interface, backups and logs."],
+    ["Evidence collection", "Interviews, questionnaires, document requests, control surveys and authorized configuration and log reviews."],
+    ["Analysis and validation", "Threat and vulnerability pairs are scored with likelihood × impact and validated with the auditee."],
+    ["Reporting", "Each finding is reported with its evidence, owner, priority and target date."],
+    ["Follow-up and retest", "Corrective actions are retested. An action counts as verified only after its evidence is reviewed."]
+  ];
+  var ASSETS = ["Student records", "Authentication service", "Web application", "Backup storage", "Security logs"];
+  var OWNERS = ["IT Security", "IT Operations", "App team", "Student Services", "System owners", "Risk lead"];
+  var STATUSES = ["Not started", "In progress", "Done", "Verified"];
+
+  function seed() {
+    return {
+      phase: 2,
+      risks: [
+        { id: "R1", scenario: "Phished administrator credentials", asset: "Authentication service", threat: "Credential phishing", vuln: "No MFA for privileged accounts", L: 4, I: 4, owner: "IT Security" },
+        { id: "R2", scenario: "Unauthorized access to another student's marks", asset: "Student records", threat: "Malicious access attempt", vuln: "Missing server-side authorization checks", L: 3, I: 5, owner: "App team" },
+        { id: "R3", scenario: "Unpatched portal component exploited", asset: "Web application", threat: "External exploitation of a web weakness", vuln: "Unpatched software", L: 3, I: 4, owner: "IT Operations" },
+        { id: "R4", scenario: "Production account accesses backups", asset: "Backup storage", threat: "Ransomware", vuln: "Backups accessible from production accounts", L: 2, I: 5, owner: "IT Operations" },
+        { id: "R5", scenario: "Insufficient logging to investigate misuse", asset: "Security logs", threat: "Privileged insider misuse", vuln: "Insufficient security logging", L: 3, I: 3, owner: "IT Security" }
+      ],
+      actions: [
+        { id: "A1", title: "Enforce MFA for privileged accounts", risk: "R1", owner: "IT Security", due: "≤ 7 days", prio: "P1", status: "In progress" },
+        { id: "A2", title: "Review server-side authorization of student records", risk: "R2", owner: "App team", due: "≤ 14 days", prio: "P1", status: "Not started" },
+        { id: "A3", title: "Identify exposed software components and prioritize patches", risk: "R3", owner: "IT Operations", due: "≤ 14 days", prio: "P1", status: "Done" },
+        { id: "A4", title: "Restrict backup access and test recovery", risk: "R4", owner: "IT Operations", due: "≤ 30 days", prio: "P2", status: "Not started" },
+        { id: "A5", title: "Centralize security logs and test privileged-activity alerts", risk: "R5", owner: "IT Security", due: "≤ 30 days", prio: "P2", status: "Not started" },
+        { id: "A6", title: "Review user access rights", risk: null, owner: "System owners", due: "Quarterly", prio: "Ongoing", status: "Not started" },
+        { id: "A7", title: "Run incident-response exercises", risk: null, owner: "IT Security", due: "Periodic", prio: "Ongoing", status: "Not started" },
+        { id: "A8", title: "Reassess risk after major system changes", risk: null, owner: "Risk lead", due: "After changes", prio: "Ongoing", status: "Not started" }
+      ],
+      log: []
+    };
+  }
+
+  var state = load() || seed();
+  var filter = null;        // { L, I } or null
+  var pendingDelete = null; // risk id awaiting confirmation
+  var freshLog = false;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      var s = JSON.parse(raw);
+      return s && Array.isArray(s.risks) && Array.isArray(s.actions) ? s : null;
+    } catch (e) { return null; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable: page still works for this session */ }
+  }
+
+  function band(score) {
+    if (score >= 16) return { name: "Critical", cls: "b-crit" };
+    if (score >= 10) return { name: "High", cls: "b-high" };
+    if (score >= 5) return { name: "Medium", cls: "b-med" };
+    return { name: "Low", cls: "b-low" };
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  }
+  function addLog(msg) {
+    state.log.unshift({ t: now(), msg: msg });
+    if (state.log.length > 60) state.log.length = 60;
+    freshLog = true;
+  }
+  function riskStatus(r) {
+    var acts = state.actions.filter(function (a) { return a.risk === r.id; });
+    if (!acts.length) return "Open";
+    if (acts.every(function (a) { return a.status === "Verified"; })) return "Verified";
+    if (acts.every(function (a) { return a.status === "Done" || a.status === "Verified"; })) return "Implemented";
+    if (acts.some(function (a) { return a.status !== "Not started"; })) return "In treatment";
+    return "Open";
+  }
+  var ST_CLASS = { "Open": "st-open", "In treatment": "st-treat", "Implemented": "st-impl", "Verified": "st-ver" };
+  function sortedRisks() {
+    return state.risks.slice().sort(function (a, b) {
+      return (b.L * b.I) - (a.L * a.I) || a.id.localeCompare(b.id, undefined, { numeric: true });
+    });
+  }
+  function opts(list, sel) {
+    return list.map(function (v) { return "<option" + (String(v) === String(sel) ? " selected" : "") + ">" + esc(v) + "</option>"; }).join("");
+  }
+
+  /* ---------- Render ---------- */
+  function renderPhase() {
+    document.getElementById("phase").innerHTML = PHASES.map(function (p, i) {
+      var cls = i === state.phase ? "current" : (i < state.phase ? "done" : "");
+      return '<button type="button" data-phase="' + i + '" class="' + cls + '"' + (i === state.phase ? ' aria-current="step"' : "") + '><span class="n">' + (i < state.phase ? "✓" : (i + 1)) + "</span>" + esc(p[0]) + "</button>";
+    }).join("");
+    document.getElementById("phaseDesc").textContent = "Phase " + (state.phase + 1) + " of 5 · " + PHASES[state.phase][1];
+  }
+
+  function renderKpis() {
+    var rs = state.risks;
+    var count = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    rs.forEach(function (r) { count[band(r.L * r.I).name]++; });
+    var top = sortedRisks()[0];
+    var total = state.actions.length;
+    var done = state.actions.filter(function (a) { return a.status === "Done" || a.status === "Verified"; }).length;
+    var ver = state.actions.filter(function (a) { return a.status === "Verified"; }).length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var verifiedRisks = rs.filter(function (r) { return riskStatus(r) === "Verified"; }).length;
+    var tiles = [
+      { label: "Risks in register", val: rs.length, note: verifiedRisks + " verified as treated" },
+      { label: "Critical", val: count.Critical, note: "Score 16–25", cls: "b-crit" },
+      { label: "High", val: count.High, note: "Score 10–15", cls: "b-high" },
+      { label: "Medium / Low", val: count.Medium + " / " + count.Low, note: "Score 1–9", cls: "b-med" },
+      { label: "Top risk", val: top ? top.L * top.I : "–", note: top ? top.id + " · " + esc(top.scenario) : "No risks recorded" },
+      { label: "Actions complete", val: pct + "%", note: done + " of " + total + " done · " + ver + " verified", bar: [ver / (total || 1), (done - ver) / (total || 1)] }
+    ];
+    document.getElementById("kpis").innerHTML = tiles.map(function (t) {
+      var sw = t.cls ? '<span class="sw ' + t.cls + '"></span>' : "";
+      var bar = t.bar ? '<div class="bar"><span style="width:' + (t.bar[0] * 100) + '%;background:var(--low)"></span><span style="width:' + (t.bar[1] * 100) + '%;background:var(--gold)"></span></div>' : "";
+      return '<div class="kpi"><div class="label">' + sw + esc(t.label) + '</div><div class="val">' + t.val + '</div><div class="note">' + t.note + "</div>" + bar + "</div>";
+    }).join("");
+  }
+
+  function renderMatrix() {
+    var html = "";
+    for (var L = 5; L >= 1; L--) {
+      if (L === 5) html += '<div class="ytitle">Likelihood</div>';
+      html += '<div class="axn">' + L + "</div>";
+      for (var I = 1; I <= 5; I++) {
+        var s = L * I, b = band(s);
+        var here = state.risks.filter(function (r) { return r.L === L && r.I === I; });
+        var sel = filter && filter.L === L && filter.I === I;
+        var label = "Likelihood " + L + ", impact " + I + ", score " + s + " " + b.name + (here.length ? ", risks " + here.map(function (r) { return r.id; }).join(" ") : ", no risks");
+        html += '<button type="button" class="cell ' + b.cls + (here.length ? " has" : "") + (sel ? " sel" : "") + '" data-l="' + L + '" data-i="' + I + '" aria-pressed="' + sel + '" aria-label="' + esc(label) + '">' +
+          '<span class="s">' + s + "</span>" +
+          '<span class="chips">' + here.map(function (r) { return '<span class="rid">' + esc(r.id) + "</span>"; }).join("") + "</span></button>";
+      }
+    }
+    html += "<div></div><div></div>";
+    for (var c = 1; c <= 5; c++) html += '<div class="axn">' + c + "</div>";
+    html += '<div></div><div></div><div class="xtitle">Impact</div>';
+    document.getElementById("matrix").innerHTML = html;
+
+    var count = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    state.risks.forEach(function (r) { count[band(r.L * r.I).name]++; });
+    var order = [["Critical", "b-crit"], ["High", "b-high"], ["Medium", "b-med"], ["Low", "b-low"]];
+    document.getElementById("dist").innerHTML = order.map(function (o) {
+      return '<span class="' + o[1] + '" style="flex-grow:' + count[o[0]] + '"></span>';
+    }).join("");
+    document.getElementById("distLabels").innerHTML = order.map(function (o) {
+      return "<span>" + o[0] + " <b>" + count[o[0]] + "</b></span>";
+    }).join("");
+  }
+
+  function renderRegister() {
+    var list = sortedRisks();
+    var topId = list.length ? list[0].id : null;
+    if (filter) list = list.filter(function (r) { return r.L === filter.L && r.I === filter.I; });
+    var note = document.getElementById("filterNote");
+    if (filter) {
+      note.hidden = false;
+      note.innerHTML = "Showing risks at likelihood " + filter.L + " × impact " + filter.I + " (" + list.length + ')<button type="button" class="btn quiet small" id="clearFilter">Show all</button>';
+    } else {
+      note.hidden = true;
+      note.innerHTML = "";
+    }
+    var body = document.getElementById("regBody");
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="8" class="hint">' + (filter ? "No risks in this cell. Click the cell again or choose Show all." : "The register is empty. Use Add risk to record the first one.") + "</td></tr>";
+      return;
+    }
+    body.innerHTML = list.map(function (r) {
+      var s = r.L * r.I, b = band(s), st = riskStatus(r);
+      var del = pendingDelete === r.id
+        ? '<div class="del-wrap"><button type="button" class="btn danger small" data-confirm="' + esc(r.id) + '">Remove</button><button type="button" class="btn quiet small" data-cancel="1">Keep</button></div>'
+        : '<div class="del-wrap"><button type="button" class="icon-btn" data-del="' + esc(r.id) + '" aria-label="Remove ' + esc(r.id) + '">✕</button></div>';
+      return '<tr class="' + (r.id === topId ? "top" : "") + '">' +
+        '<td class="id">' + esc(r.id) + "</td>" +
+        '<td class="scen"><strong>' + esc(r.scenario) + "</strong><small>" + esc(r.asset) + " · " + esc(r.threat || "Threat not recorded") + " + " + esc(r.vuln || "vulnerability not recorded") + "<br>Owner: " + esc(r.owner) + "</small></td>" +
+        '<td><select class="mini" id="L-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="L" aria-label="Likelihood for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.L) + "</select></td>" +
+        '<td><select class="mini" id="I-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="I" aria-label="Impact for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.I) + "</select></td>" +
+        '<td class="score">' + s + " <small>" + r.L + "×" + r.I + "</small></td>" +
+        '<td><span class="pill ' + b.cls + '">' + b.name + "</span></td>" +
+        '<td><span class="st ' + ST_CLASS[st] + '">' + st + "</span></td>" +
+        "<td>" + del + "</td></tr>";
+    }).join("");
+  }
+
+  function renderTracker() {
+    var total = state.actions.length;
+    var done = state.actions.filter(function (a) { return a.status === "Done" || a.status === "Verified"; }).length;
+    var ver = state.actions.filter(function (a) { return a.status === "Verified"; }).length;
+    var inprog = state.actions.filter(function (a) { return a.status === "In progress"; }).length;
+    document.getElementById("progress").innerHTML =
+      '<span style="width:' + (ver / (total || 1) * 100) + '%;background:var(--low)"></span>' +
+      '<span style="width:' + ((done - ver) / (total || 1) * 100) + '%;background:var(--gold)"></span>' +
+      '<span style="width:' + (inprog / (total || 1) * 100) + '%;background:var(--info)"></span>';
+    document.getElementById("progText").innerHTML =
+      "<span>Verified <b>" + ver + "</b></span><span>Done, awaiting verification <b>" + (done - ver) + "</b></span><span>In progress <b>" + inprog + "</b></span><span>Not started <b>" + (total - done - inprog) + "</b></span>";
+    document.getElementById("actions").innerHTML = state.actions.map(function (a) {
+      var linked = a.risk ? (state.risks.some(function (r) { return r.id === a.risk; }) ? "linked to " + esc(a.risk) : "linked risk removed") : "applies to all risks";
+      return '<li class="action s-' + a.status.replace(/\s/g, "") + '">' +
+        '<span class="prio prio-' + esc(a.prio) + '">' + esc(a.prio) + "</span>" +
+        '<div><div class="title">' + esc(a.title) + '</div><div class="meta">' + esc(a.owner) + " · " + esc(a.due) + " · " + linked + "</div></div>" +
+        '<select id="act-' + esc(a.id) + '" data-act="' + esc(a.id) + '" aria-label="Status of ' + esc(a.title) + '">' + opts(STATUSES, a.status) + "</select></li>";
+    }).join("");
+  }
+
+  function renderLog() {
+    var ul = document.getElementById("log");
+    ul.innerHTML = state.log.map(function (e, i) {
+      return '<li class="' + (i === 0 && freshLog ? "fresh" : "") + '"><time>' + esc(e.t) + "</time><span>" + esc(e.msg) + "</span></li>";
+    }).join("");
+    document.getElementById("logCount").textContent = state.log.length + (state.log.length === 1 ? " event" : " events");
+    freshLog = false;
+  }
+
+  function render() {
+    renderPhase(); renderKpis(); renderMatrix(); renderRegister(); renderTracker(); renderLog();
+  }
+  function commit() { save(); render(); }
+
+  /* ---------- Events ---------- */
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.dataset.field) {
+      var r = state.risks.find(function (x) { return x.id === t.dataset.id; });
+      if (!r) return;
+      var f = t.dataset.field, before = r[f], oldS = r.L * r.I, oldB = band(oldS).name;
+      r[f] = Number(t.value);
+      var newS = r.L * r.I, newB = band(newS).name;
+      addLog(r.id + " " + (f === "L" ? "likelihood" : "impact") + " " + before + " → " + r[f] + " · score " + oldS + " → " + newS + (oldB !== newB ? " (" + oldB + " → " + newB + ")" : ""));
+      commit();
+    } else if (t.dataset.act) {
+      var a = state.actions.find(function (x) { return x.id === t.dataset.act; });
+      if (!a) return;
+      var linked = a.risk ? state.risks.find(function (x) { return x.id === a.risk; }) : null;
+      var stBefore = linked ? riskStatus(linked) : null;
+      var old = a.status;
+      a.status = t.value;
+      var msg = a.id + " \"" + a.title + "\": " + old + " → " + a.status;
+      if (linked) {
+        var stAfter = riskStatus(linked);
+        if (stAfter !== stBefore) msg += " · " + linked.id + " now " + stAfter;
+      }
+      addLog(msg);
+      commit();
+    }
+  });
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.phase !== undefined) {
+      var p = Number(t.dataset.phase);
+      if (p !== state.phase) {
+        addLog("Audit phase moved to " + (p + 1) + ": " + PHASES[p][0]);
+        state.phase = p;
+        commit();
+      }
+    } else if (t.classList.contains("cell")) {
+      var L = Number(t.dataset.l), I = Number(t.dataset.i);
+      filter = filter && filter.L === L && filter.I === I ? null : { L: L, I: I };
+      render();
+    } else if (t.id === "clearFilter") {
+      filter = null; render();
+    } else if (t.dataset.del) {
+      pendingDelete = t.dataset.del; renderRegister();
+    } else if (t.dataset.cancel) {
+      pendingDelete = null; renderRegister();
+    } else if (t.dataset.confirm) {
+      var id = t.dataset.confirm;
+      state.risks = state.risks.filter(function (r) { return r.id !== id; });
+      pendingDelete = null;
+      addLog(id + " removed from the register");
+      commit();
+    }
+  });
+
+  // Add-risk form
+  var form = document.getElementById("addForm");
+  var toggle = document.getElementById("addToggle");
+  document.getElementById("fAsset").innerHTML = opts(ASSETS, ASSETS[0]);
+  document.getElementById("fOwner").innerHTML = opts(OWNERS, OWNERS[0]);
+  function setForm(open) {
+    form.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = open ? "Close form" : "Add risk";
+    if (open) { updatePreview(); document.getElementById("fScenario").focus(); }
+  }
+  function updatePreview() {
+    var L = Number(document.getElementById("fL").value), I = Number(document.getElementById("fI").value);
+    document.getElementById("fLv").textContent = L;
+    document.getElementById("fIv").textContent = I;
+    var s = L * I, b = band(s);
+    document.getElementById("fPreview").innerHTML = '<span class="hint">Live score</span><span class="score">' + L + " × " + I + " = " + s + '</span><span class="pill ' + b.cls + '">' + b.name + "</span>";
+  }
+  toggle.addEventListener("click", function () { setForm(form.hidden); });
+  document.getElementById("addCancel").addEventListener("click", function () { setForm(false); });
+  document.getElementById("fL").addEventListener("input", updatePreview);
+  document.getElementById("fI").addEventListener("input", updatePreview);
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var scen = document.getElementById("fScenario").value.trim();
+    var err = document.getElementById("fErr");
+    if (!scen) { err.hidden = false; document.getElementById("fScenario").focus(); return; }
+    err.hidden = true;
+    var next = state.risks.reduce(function (m, r) { var n = parseInt(String(r.id).slice(1), 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1;
+    var r = {
+      id: "R" + next, scenario: scen,
+      asset: document.getElementById("fAsset").value,
+      threat: document.getElementById("fThreat").value.trim(),
+      vuln: document.getElementById("fVuln").value.trim(),
+      L: Number(document.getElementById("fL").value), I: Number(document.getElementById("fI").value),
+      owner: document.getElementById("fOwner").value
+    };
+    state.risks.push(r);
+    var s = r.L * r.I;
+    addLog(r.id + " added: \"" + r.scenario + "\" · " + r.L + " × " + r.I + " = " + s + " (" + band(s).name + ")");
+    form.reset();
+    setForm(false);
+    commit();
+  });
+
+  // Reset with in-page confirmation
+  var resetBtn = document.getElementById("resetBtn"), resetTimer = null;
+  resetBtn.addEventListener("click", function () {
+    if (!resetBtn.classList.contains("armed")) {
+      resetBtn.classList.add("armed");
+      resetBtn.textContent = "Click again to reset";
+      resetTimer = setTimeout(function () { resetBtn.classList.remove("armed"); resetBtn.textContent = "Reset demo data"; }, 3500);
+      return;
+    }
+    clearTimeout(resetTimer);
+    resetBtn.classList.remove("armed");
+    resetBtn.textContent = "Reset demo data";
+    state = seed(); filter = null; pendingDelete = null;
+    addLog("Demo data reset to the hypothetical case study");
+    commit();
+  });
+
+  // Live clock
+  var clock = document.getElementById("clock");
+  function tick() { clock.textContent = now(); }
+  tick(); setInterval(tick, 1000);
+
+  if (!state.log.length) addLog("Dashboard loaded with the hypothetical case-study data (R1–R5)");
+  else addLog("Session resumed");
+  commit();
+})();
+</script>
+</body>
+</html>
