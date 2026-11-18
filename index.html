@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Portal Risk Dashboard</title>
+<meta name="description" content="Interactive risk assessment and audit dashboard for a hypothetical college student portal (21CSC308T case study).">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <style>
-/* Layout: control-room board. Navy masthead with the audit-phase rail, KPI strip, heat map beside the risk register, remediation tracker beside the live activity log. */
+/* Layout: control-room board. Navy masthead with the audit-phase rail, KPI strip, heat map + exposure trend beside the risk register, remediation tracker beside the live activity log. */
 :root {
   --font-display: "Source Serif 4", Cambria, Georgia, serif;
   --font-body: "IBM Plex Sans", Calibri, "Segoe UI", system-ui, sans-serif;
@@ -26,6 +27,8 @@
   --info: #1F5FA8; --info-soft: #DCE8F6;
   --chip-bg: #0B1F3A; --chip-ink: #FFFFFF;
   --live: #2FB36F;
+  --series-a: #8592A6; --series-b: #1F5FA8;
+  --shadow: 0 10px 30px rgba(11,31,58,.18);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -39,6 +42,8 @@
     --crit: #D2483A; --crit-soft: #3A1715; --crit-ink: #F09A90;
     --info: #7FB0EA; --info-soft: #14263F;
     --chip-bg: #F1F4F8; --chip-ink: #0B1F3A;
+    --series-a: #7D8A9E; --series-b: #7FB0EA;
+    --shadow: 0 10px 30px rgba(0,0,0,.5);
     color-scheme: dark;
   }
 }
@@ -53,6 +58,8 @@
   --crit: #D2483A; --crit-soft: #3A1715; --crit-ink: #F09A90;
   --info: #7FB0EA; --info-soft: #14263F;
   --chip-bg: #F1F4F8; --chip-ink: #0B1F3A;
+  --series-a: #7D8A9E; --series-b: #7FB0EA;
+  --shadow: 0 10px 30px rgba(0,0,0,.5);
   color-scheme: dark;
 }
 
@@ -61,9 +68,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(-
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 h1, h2 { text-wrap: balance; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .wrap {
-  max-width: 1280px; margin-inline: auto;
+  max-width: 1320px; margin-inline: auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
@@ -75,12 +83,13 @@ h1, h2 { text-wrap: balance; }
 .eyebrow { font: 600 11px/1.3 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--mast-gold); }
 h1 { font: 700 clamp(26px, 4vw, 36px)/1.1 var(--font-display); margin: 6px 0 4px; }
 .sub { margin: 0; color: var(--mast-muted); font-size: 14px; }
-.mast-side { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.live { display: flex; align-items: center; gap: 8px; font: 500 13px var(--font-mono); color: var(--mast-muted); font-variant-numeric: tabular-nums; }
+.mast-side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.live { display: flex; align-items: center; gap: 8px; font: 500 13px var(--font-mono); color: var(--mast-muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 2s ease-out infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--live); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 
 .phase-row { padding-block: 0 18px; display: grid; gap: 8px; }
+.phase-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .phase-label { font: 600 11px var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--mast-muted); }
 .phase { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .phase button {
@@ -88,19 +97,26 @@ h1 { font: 700 clamp(26px, 4vw, 36px)/1.1 var(--font-display); margin: 6px 0 4px
   font: 500 13px/1.2 var(--font-body); color: var(--mast-muted);
   background: var(--mast-chip); border: 1px solid var(--mast-line); border-radius: 8px; padding: 8px 12px; cursor: pointer;
 }
+.phase button:hover { border-color: var(--mast-gold); }
 .phase button .n { font: 600 12px var(--font-mono); }
 .phase button.done { color: var(--mast-ink); }
 .phase button.done .n { color: var(--mast-gold); }
 .phase button.current { background: var(--mast-gold); color: var(--mast-gold-ink); border-color: var(--mast-gold); font-weight: 600; }
 .phase-desc { margin: 0; font-size: 13.5px; color: var(--mast-muted); }
 
-.btn { font: 600 14px var(--font-body); border-radius: 8px; padding: 8px 14px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.btn { font: 600 14px var(--font-body); border-radius: 8px; padding: 8px 14px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); }
 .btn.quiet { background: transparent; border-color: var(--line); color: var(--ink); }
+.btn.quiet:hover:not(:disabled) { background: var(--surface-2); }
 .btn.on-mast { background: transparent; border-color: var(--mast-line); color: var(--mast-ink); }
+.btn.on-mast:hover:not(:disabled) { background: var(--mast-chip); border-color: var(--mast-muted); }
 .btn.on-mast.armed { background: var(--crit); border-color: var(--crit); color: var(--on-crit); }
+.btn.gold { background: var(--mast-gold); color: var(--mast-gold-ink); }
+.btn.gold.running { background: var(--crit); color: var(--on-crit); }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .btn.danger { background: var(--crit); color: var(--on-crit); }
+kbd { font: 500 11px var(--font-mono); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; opacity: .7; }
 
 .notice { margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; background: var(--gold-soft); border: 1px solid var(--gold-line); font-size: 13.5px; }
 .notice strong { color: var(--gold-ink); }
@@ -108,44 +124,63 @@ h1 { font: 700 clamp(26px, 4vw, 36px)/1.1 var(--font-display); margin: 6px 0 4px
 main.wrap { display: grid; gap: 20px; padding-block: 20px 8px; }
 
 /* KPIs */
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; text-align: left; font: inherit; color: inherit; }
+button.kpi { cursor: pointer; transition: border-color .15s ease, transform .15s ease; }
+button.kpi:hover { border-color: var(--x, var(--focus)); transform: translateY(-1px); }
+button.kpi.active { border-color: var(--x); box-shadow: inset 0 0 0 1px var(--x); }
 .kpi .label { display: flex; align-items: center; gap: 7px; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .kpi .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--x, var(--muted)); flex: none; }
-.kpi .val { font: 700 32px/1.05 var(--font-display); font-variant-numeric: tabular-nums; }
+.kpi .val { font: 700 32px/1.05 var(--font-display); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.kpi .val small { font: 600 13px var(--font-body); color: var(--muted); }
+.kpi .delta { font: 600 12.5px var(--font-body); padding: 1px 7px; border-radius: 999px; }
+.kpi .delta.down { background: var(--low-soft); color: var(--low-ink); }
+.kpi .delta.flat { background: var(--surface-2); color: var(--muted); }
 .kpi .note { font-size: 12.5px; color: var(--muted); }
-.kpi .bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: flex; margin-top: 4px; }
-.kpi .bar span { display: block; height: 100%; }
+.kpi .bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: flex; gap: 2px; margin-top: 4px; }
+.kpi .bar span { display: block; height: 100%; transition: width .4s ease; }
 
 /* Panels */
-.grid-a { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.grid-a { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .grid-b { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 5fr); gap: 20px; align-items: start; }
-@media (max-width: 1000px) { .grid-a, .grid-b { grid-template-columns: minmax(0, 1fr); } }
+.col { display: grid; gap: 20px; min-width: 0; }
+@media (max-width: 1060px) { .grid-a, .grid-b { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; display: grid; gap: 14px; align-content: start; }
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.panel-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 h2 { font: 700 19px/1.2 var(--font-display); margin: 0; }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
 
+/* Segmented control */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--surface-2); }
+.seg button { font: 600 12.5px var(--font-body); border: 0; background: transparent; color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
 /* Heat map */
 .matrix { display: grid; grid-template-columns: 22px 20px repeat(5, minmax(0, 1fr)); gap: 4px; max-width: 460px; }
-.ytitle { grid-row: 1 / span 5; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; align-self: center; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ytitle { grid-row: 1 / span 5; grid-column: 1; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; align-self: center; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .xtitle { grid-column: 3 / -1; text-align: center; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .axn { display: grid; place-items: center; font: 600 13px var(--font-mono); color: var(--muted); }
 .cell {
   aspect-ratio: 1; max-width: 100%; min-width: 0; border: 0; border-radius: 6px; padding: 5px; cursor: pointer;
   display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 2px;
-  font: inherit; background: var(--soft); color: var(--ink); transition: transform .12s ease;
+  font: inherit; background: var(--soft); color: var(--ink); transition: transform .12s ease, box-shadow .12s ease;
 }
 .cell.has { background: var(--x); color: var(--on-x); }
 .cell:hover { transform: scale(1.04); }
 .cell.sel { outline: 3px solid var(--ink); outline-offset: 2px; }
+.cell.drop { box-shadow: inset 0 0 0 3px var(--ink); transform: scale(1.06); }
 .cell .s { font: 600 12px var(--font-mono); opacity: .9; }
 .chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .rid { font: 600 11px/1.5 var(--font-mono); background: var(--chip-bg); color: var(--chip-ink); border-radius: 999px; padding: 0 6px; }
+.rid.moved { box-shadow: 0 0 0 2px var(--low); }
+.rid[draggable="true"] { cursor: grab; }
+.rid.dragging { opacity: .4; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; }
-.legend span { font: 600 12px var(--font-body); padding: 3px 10px; border-radius: 999px; background: var(--x); color: var(--on-x); }
-.dist { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-2); }
-.dist span { display: block; height: 100%; background: var(--x); transition: flex-grow .3s ease; }
+.legend button { font: 600 12px var(--font-body); padding: 3px 10px; border-radius: 999px; background: var(--x); color: var(--on-x); border: 2px solid transparent; cursor: pointer; }
+.legend button[aria-pressed="true"] { border-color: var(--ink); }
+.dist { display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-2); }
+.dist span { display: block; height: 100%; background: var(--x); transition: flex-grow .4s ease; }
 .dist-labels { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
 .dist-labels b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
@@ -155,74 +190,142 @@ h2 { font: 700 19px/1.2 var(--font-display); margin: 0; }
 .b-med  { --x: var(--med);  --on-x: var(--on-med);  --soft: var(--med-soft); }
 .b-low  { --x: var(--low);  --on-x: var(--on-low);  --soft: var(--low-soft); }
 
+/* Trend chart */
+.trend { position: relative; }
+.trend svg { display: block; width: 100%; height: auto; overflow: visible; }
+.trend .grid line { stroke: var(--line); stroke-width: 1; }
+.trend .axis text { fill: var(--muted); font: 500 11px var(--font-mono); }
+.trend .s-a { fill: none; stroke: var(--series-a); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.trend .s-b { fill: none; stroke: var(--series-b); stroke-width: 2; stroke-linejoin: round; }
+.trend .area { fill: var(--series-b); opacity: .08; }
+.trend .dl { font: 600 12px var(--font-body); fill: var(--ink); }
+.trend .cross { stroke: var(--muted); stroke-width: 1; }
+.trend .mk { stroke: var(--surface); stroke-width: 2; }
+.trend .hit { fill: transparent; cursor: crosshair; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; min-width: 150px; z-index: 5; }
+.tip b { font-variant-numeric: tabular-nums; }
+.tip .row { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.tip .k { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 4px; }
+.tip .t { color: var(--muted); font: 500 11.5px var(--font-mono); margin-bottom: 2px; }
+.tip .m { color: var(--muted); margin-top: 4px; max-width: 240px; }
+.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.key span { display: inline-flex; align-items: center; gap: 6px; }
+.key i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--series-b); }
+.key i.a { border-top: 2px dashed var(--series-a); }
+
 /* Register */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { flex: 1 1 220px; position: relative; }
+.search input { width: 100%; font: 400 14px var(--font-body); padding: 7px 10px 7px 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); }
 .filter-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-soft); color: var(--ink); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
-table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 14px; }
-th { background: var(--surface-2); text-align: left; font: 600 11.5px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px; white-space: nowrap; }
-td { padding: 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+.table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 740px; font-size: 14px; }
+th { background: var(--surface-2); text-align: left; font: 600 11.5px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 8px; white-space: nowrap; }
+td { padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: middle; }
 tr.top td { background: var(--gold-soft); }
+tr.flash td { animation: rowflash 1.6s ease-out; }
+@keyframes rowflash { from { background: var(--info-soft); } }
 td.id { font: 600 14px var(--font-mono); }
-.scen { min-width: 230px; }
+.scen { min-width: 190px; }
 .scen strong { display: block; font-weight: 600; }
 .scen small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+select.treat { font: 500 13px var(--font-body); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
 .score { font: 600 15px var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .score small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.inh, .resid { display: grid; justify-items: start; gap: 4px; white-space: nowrap; }
+.lxi { display: flex; align-items: center; gap: 4px; font: 500 13px var(--font-mono); color: var(--muted); white-space: nowrap; }
+.resid { font: 600 13px var(--font-mono); color: var(--muted); }
+.resid .pill { font-size: 11.5px; padding: 2px 8px; }
+.resid.achieved { color: var(--low-ink); }
 .pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--font-body); background: var(--x); color: var(--on-x); white-space: nowrap; }
+.pill.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--x); }
 .st { display: inline-flex; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--font-body); white-space: nowrap; border: 1px solid transparent; }
 .st-open { border-color: var(--line); color: var(--muted); }
 .st-treat { background: var(--info-soft); color: var(--info); }
 .st-impl { background: var(--gold-soft); color: var(--gold-ink); }
 .st-ver { background: var(--low-soft); color: var(--low-ink); }
-.del-wrap { display: flex; gap: 6px; justify-content: flex-end; }
-.icon-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 500 12.5px var(--font-body); }
+.st-acc { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
+.row-tools { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.icon-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 500 12.5px var(--font-body); white-space: nowrap; }
+.icon-btn:hover { color: var(--ink); border-color: var(--muted); }
 
-/* Add form */
-.add-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; background: var(--surface-2); padding: 14px; border-radius: 10px; }
-.add-form label { display: grid; gap: 4px; font: 600 12px var(--font-body); color: var(--muted); min-width: 0; }
-.add-form input[type="text"], .add-form select { font: 400 14px var(--font-body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); width: 100%; }
-.add-form input[type="range"] { width: 100%; accent-color: var(--accent); }
-.add-form .wide { grid-column: 1 / -1; }
+/* Forms */
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; background: var(--surface-2); padding: 14px; border-radius: 10px; }
+.form-title { grid-column: 1 / -1; margin: 0; font: 700 15px var(--font-body); }
+.form label { display: grid; gap: 4px; font: 600 12px var(--font-body); color: var(--muted); min-width: 0; align-content: start; }
+.form input[type="text"], .form select { font: 400 14px var(--font-body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); width: 100%; }
+.form input[type="range"] { width: 100%; accent-color: var(--accent); }
+.form .wide { grid-column: 1 / -1; }
+.form fieldset { grid-column: 1 / -1; border: 1px dashed var(--line); border-radius: 8px; margin: 0; padding: 10px 12px 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.form legend { font: 600 12px var(--font-body); color: var(--ink); padding: 0 4px; }
 .rangeval { font: 600 13px var(--font-mono); color: var(--ink); }
 .preview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .preview .score { font-size: 16px; }
 .form-err { color: var(--crit-ink); font-size: 13px; margin: 0; }
 
 /* Tracker */
-.progress { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: flex; }
-.progress span { display: block; height: 100%; transition: width .3s ease; }
+.progress { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: flex; gap: 2px; }
+.progress span { display: block; height: 100%; transition: width .4s ease; }
 .prog-text { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13.5px; color: var(--muted); }
+.prog-text span { display: inline-flex; align-items: center; gap: 6px; }
+.prog-text i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .prog-text b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.action { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.action { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; transition: border-color .2s ease, background .2s ease; }
 .action .title { font-weight: 600; }
 .action .meta { font-size: 12.5px; color: var(--muted); }
+.action .meta .warn { color: var(--crit-ink); font-weight: 600; }
 .prio { font: 600 11.5px var(--font-mono); text-align: center; padding: 3px 6px; border-radius: 6px; }
 .prio-P1 { background: var(--crit-soft); color: var(--crit-ink); }
 .prio-P2 { background: var(--high-soft); color: var(--high-ink); }
+.prio-P3 { background: var(--med-soft); color: var(--med-ink); }
 .prio-Ongoing { background: var(--surface-2); color: var(--muted); }
 .action select { font: 500 13.5px var(--font-body); padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
-.action.s-Verified { border-color: var(--low); }
+.action.s-Verified { border-color: var(--low); background: color-mix(in srgb, var(--low-soft) 45%, transparent); }
 .action.s-Done { border-color: var(--gold-line); }
-@media (max-width: 560px) {
-  .action { grid-template-columns: 64px minmax(0, 1fr); }
-  .action select { grid-column: 1 / -1; }
+.action.s-Inprogress { border-color: color-mix(in srgb, var(--info) 45%, var(--line)); }
+.action.hl { box-shadow: 0 0 0 2px var(--focus); }
+@media (max-width: 600px) {
+  .action { grid-template-columns: 64px minmax(0, 1fr) auto; }
+  .action select { grid-column: 1 / 3; grid-row: 2; }
 }
+.empty { padding: 14px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; }
 
 /* Log */
-.log { list-style: none; margin: 0; padding: 0; max-height: 470px; overflow: auto; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 560px; overflow: auto; }
 .log li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
 .log li:first-child { border-top: 0; }
 .log time { font: 500 12.5px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .log li.fresh { animation: flash 1.2s ease-out; }
+.log .day { display: block; grid-column: 1 / -1; font: 600 11px var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
 @keyframes flash { from { background: var(--gold-soft); } to { background: transparent; } }
+
+/* Toast */
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; transition: opacity .2s ease, transform .2s ease; background: var(--mast); color: var(--mast-ink); border-radius: 10px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow); font-size: 14px; z-index: 50; max-width: calc(100vw - 32px); pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast .btn { padding: 4px 10px; font-size: 13px; }
 
 .foot { padding-block: 8px 28px; color: var(--muted); font-size: 12.5px; display: grid; gap: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot, .log li.fresh { animation: none; }
-  .cell, .dist span, .progress span { transition: none; }
+  .dot, .log li.fresh, tr.flash td { animation: none; }
+  .cell, .dist span, .progress span, .kpi .bar span, button.kpi, .toast { transition: none; }
+}
+
+@media print {
+  body { background: #fff; color: #000; font-size: 12px; }
+  .mast { background: #fff; color: #000; border-bottom: 2px solid #000; }
+  .mast .eyebrow, .sub, .phase-desc, .phase-label { color: #333; }
+  .mast-side, .panel-tools, .toolbar, .row-tools, .form, .toast, .legend, #addActToggle, .seg, .trend .hit { display: none !important; }
+  .phase button { color: #000; border-color: #999; background: #fff; }
+  .phase button.current { background: #eee; }
+  .grid-a, .grid-b { grid-template-columns: 1fr; }
+  .panel, .kpi { break-inside: avoid; box-shadow: none; }
+  .log { max-height: none; }
+  table { min-width: 0; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
 </head>
@@ -237,11 +340,16 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
     </div>
     <div class="mast-side">
       <div class="live"><span class="dot" aria-hidden="true"></span><span>Live session</span><time id="clock"></time></div>
+      <button type="button" class="btn gold" id="playBtn" title="Walk through the audit follow-up automatically">▶ Play demo</button>
+      <button type="button" class="btn on-mast" id="undoBtn" title="Undo the last change (Ctrl+Z)" disabled>↶ Undo</button>
+      <button type="button" class="btn on-mast" id="themeBtn" title="Switch colour theme">Theme: Auto</button>
       <button type="button" class="btn on-mast" id="resetBtn">Reset demo data</button>
     </div>
   </div>
   <div class="wrap phase-row">
-    <div class="phase-label">Audit phase</div>
+    <div class="phase-top">
+      <div class="phase-label">Audit phase</div>
+    </div>
     <div class="phase" id="phase" role="group" aria-label="Audit phase"></div>
     <p class="phase-desc" id="phaseDesc"></p>
   </div>
@@ -255,27 +363,44 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
   <section class="kpis" id="kpis" aria-label="Key figures"></section>
 
   <section class="grid-a">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Risk heat map</h2>
-      </div>
-      <p class="hint">Likelihood × impact, 1 to 5 each. Click a cell to filter the register.</p>
-      <div class="matrix" id="matrix"></div>
-      <div class="legend">
-        <span class="b-low">Low 1–4</span><span class="b-med">Medium 5–9</span><span class="b-high">High 10–15</span><span class="b-crit">Critical 16–25</span>
-      </div>
-      <div>
+    <div class="col">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Risk heat map</h2>
+          <div class="seg" role="group" aria-label="Heat map view">
+            <button type="button" data-view="inherent" aria-pressed="true">Inherent</button>
+            <button type="button" data-view="residual" aria-pressed="false">Residual</button>
+          </div>
+        </div>
+        <p class="hint" id="mapHint"></p>
+        <div class="matrix" id="matrix"></div>
+        <div class="legend" id="legend" role="group" aria-label="Filter by rating"></div>
         <div class="dist" id="dist" aria-hidden="true"></div>
+        <div class="dist-labels" id="distLabels"></div>
       </div>
-      <div class="dist-labels" id="distLabels"></div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Risk exposure trend</h2>
+          <span class="hint" id="trendNote"></span>
+        </div>
+        <p class="hint">Total exposure is the sum of all risk scores. Residual drops only when a risk's actions are verified.</p>
+        <div class="key"><span><i></i>Residual exposure</span><span><i class="a"></i>Inherent exposure</span></div>
+        <div class="trend" id="trend"></div>
+      </div>
     </div>
 
     <div class="panel">
       <div class="panel-head">
         <h2>Risk register</h2>
-        <button type="button" class="btn primary" id="addToggle" aria-expanded="false" aria-controls="addForm">Add risk</button>
+        <div class="panel-tools">
+          <button type="button" class="btn quiet" id="csvBtn">Export CSV</button>
+          <button type="button" class="btn quiet" id="printBtn">Print report</button>
+          <button type="button" class="btn primary" id="addToggle" aria-expanded="false" aria-controls="addForm">Add risk</button>
+        </div>
       </div>
-      <form class="add-form" id="addForm" hidden novalidate>
+      <form class="form" id="addForm" hidden novalidate>
+        <p class="form-title" id="formTitle">New risk</p>
         <label class="wide" for="fScenario">Risk scenario
           <input type="text" id="fScenario" placeholder="e.g. Session not ended after logout on shared lab PCs" maxlength="120">
         </label>
@@ -297,18 +422,39 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
         <label for="fI">Impact <span class="rangeval" id="fIv">3</span>
           <input type="range" id="fI" min="1" max="5" value="3">
         </label>
+        <fieldset>
+          <legend>Treatment plan</legend>
+          <label for="fTreat">Treatment option
+            <select id="fTreat"></select>
+          </label>
+          <label for="fRL">Target likelihood <span class="rangeval" id="fRLv">2</span>
+            <input type="range" id="fRL" min="1" max="5" value="2">
+          </label>
+          <label for="fRI">Target impact <span class="rangeval" id="fRIv">3</span>
+            <input type="range" id="fRI" min="1" max="5" value="3">
+          </label>
+          <label class="wide" for="fAction" id="fActionWrap">First remediation action (optional)
+            <input type="text" id="fAction" placeholder="e.g. Enforce a 15-minute idle session timeout" maxlength="100">
+          </label>
+        </fieldset>
         <div class="preview" id="fPreview"></div>
-        <p class="form-err wide" id="fErr" hidden>Enter a risk scenario before adding.</p>
+        <p class="form-err wide" id="fErr" hidden>Enter a risk scenario before saving.</p>
         <div class="preview">
-          <button type="submit" class="btn primary">Add to register</button>
+          <button type="submit" class="btn primary" id="fSubmit">Add to register</button>
           <button type="button" class="btn quiet" id="addCancel">Cancel</button>
         </div>
       </form>
+      <div class="toolbar">
+        <label class="search"><span class="sr-only">Search risks</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+          <input type="search" id="search" placeholder="Search scenario, asset, owner, threat…">
+        </label>
+      </div>
       <div class="filter-note" id="filterNote" hidden></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>ID</th><th>Scenario</th><th>Likelihood</th><th>Impact</th><th>Score</th><th>Rating</th><th>Status</th><th><span hidden>Remove</span></th></tr>
+            <tr><th>ID</th><th>Scenario</th><th title="Likelihood × impact">L × I</th><th>Inherent</th><th>Treatment</th><th>Target residual</th><th>Status</th><th><span class="sr-only">Row actions</span></th></tr>
           </thead>
           <tbody id="regBody"></tbody>
         </table>
@@ -320,8 +466,27 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
     <div class="panel">
       <div class="panel-head">
         <h2>Remediation tracker</h2>
+        <div class="panel-tools">
+          <div class="seg" role="group" aria-label="Filter actions by status" id="actFilter"></div>
+          <button type="button" class="btn primary" id="addActToggle" aria-expanded="false" aria-controls="actForm">Add action</button>
+        </div>
       </div>
       <p class="hint">A risk counts as treated only after every linked action is verified with evidence.</p>
+      <form class="form" id="actForm" hidden novalidate>
+        <p class="form-title">New remediation action</p>
+        <label class="wide" for="aTitle">Action
+          <input type="text" id="aTitle" placeholder="e.g. Add rate limiting to the login endpoint" maxlength="100">
+        </label>
+        <label for="aRisk">Linked risk <select id="aRisk"></select></label>
+        <label for="aOwner">Owner <select id="aOwner"></select></label>
+        <label for="aPrio">Priority <select id="aPrio"></select></label>
+        <label for="aDue">Target date <select id="aDue"></select></label>
+        <p class="form-err wide" id="aErr" hidden>Describe the action before adding it.</p>
+        <div class="preview">
+          <button type="submit" class="btn primary">Add action</button>
+          <button type="button" class="btn quiet" id="actCancel">Cancel</button>
+        </div>
+      </form>
       <div class="progress" id="progress" aria-hidden="true"></div>
       <div class="prog-text" id="progText"></div>
       <ul class="actions" id="actions"></ul>
@@ -337,14 +502,19 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
 </main>
 
 <footer class="wrap foot">
-  <div>Method: risk score = likelihood × impact. Bands are example values: Low 1–4, Medium 5–9, High 10–15, Critical 16–25.</div>
+  <div>Method: risk score = likelihood × impact. Bands are example values: Low 1–4, Medium 5–9, High 10–15, Critical 16–25. Residual risk applies once every linked action is verified. Treatment options follow ISO/IEC 27005 (modify, retain, avoid, share).</div>
+  <div>Shortcuts: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>/</kbd> search · <kbd>Esc</kbd> close form or clear filters. Drag a risk chip on the heat map to re-score it.</div>
   <div>References: NIST SP 800-30 Rev. 1 · ISO/IEC 27001:2022 · ISO/IEC 27005:2022 · NIST SP 800-53 Rev. 5 · OWASP Top 10:2025.</div>
 </footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button type="button" class="btn gold" id="toastUndo">Undo</button></div>
 
 <script>
 (function () {
   "use strict";
-  var KEY = "srmp-portal-risk-dashboard-v1";
+  var KEY = "srmp-portal-risk-dashboard-v2";
+  var OLD_KEY = "srmp-portal-risk-dashboard-v1";
+  var THEME_KEY = "srmp-portal-risk-dashboard-theme";
   var PHASES = [
     ["Pre-planning and scope", "Sponsor approves the scope: portal, authentication, database, admin interface, backups and logs."],
     ["Evidence collection", "Interviews, questionnaires, document requests, control surveys and authorized configuration and log reviews."],
@@ -352,19 +522,24 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
     ["Reporting", "Each finding is reported with its evidence, owner, priority and target date."],
     ["Follow-up and retest", "Corrective actions are retested. An action counts as verified only after its evidence is reviewed."]
   ];
-  var ASSETS = ["Student records", "Authentication service", "Web application", "Backup storage", "Security logs"];
+  var ASSETS = ["Student records", "Authentication service", "Web application", "Backup storage", "Security logs", "Network infrastructure", "Lab workstations"];
   var OWNERS = ["IT Security", "IT Operations", "App team", "Student Services", "System owners", "Risk lead"];
   var STATUSES = ["Not started", "In progress", "Done", "Verified"];
+  var TREATMENTS = ["Mitigate", "Transfer", "Avoid", "Accept"];
+  var TREAT_HINT = { Mitigate: "modify", Transfer: "share", Avoid: "avoid", Accept: "retain" };
+  var PRIOS = ["P1", "P2", "P3", "Ongoing"];
+  var DUES = ["≤ 7 days", "≤ 14 days", "≤ 30 days", "≤ 90 days", "Quarterly", "Periodic", "After changes"];
+  var BANDS = [["Critical", "b-crit"], ["High", "b-high"], ["Medium", "b-med"], ["Low", "b-low"]];
 
   function seed() {
     return {
-      phase: 2,
+      v: 2, phase: 2, seq: 5, aseq: 8,
       risks: [
-        { id: "R1", scenario: "Phished administrator credentials", asset: "Authentication service", threat: "Credential phishing", vuln: "No MFA for privileged accounts", L: 4, I: 4, owner: "IT Security" },
-        { id: "R2", scenario: "Unauthorized access to another student's marks", asset: "Student records", threat: "Malicious access attempt", vuln: "Missing server-side authorization checks", L: 3, I: 5, owner: "App team" },
-        { id: "R3", scenario: "Unpatched portal component exploited", asset: "Web application", threat: "External exploitation of a web weakness", vuln: "Unpatched software", L: 3, I: 4, owner: "IT Operations" },
-        { id: "R4", scenario: "Production account accesses backups", asset: "Backup storage", threat: "Ransomware", vuln: "Backups accessible from production accounts", L: 2, I: 5, owner: "IT Operations" },
-        { id: "R5", scenario: "Insufficient logging to investigate misuse", asset: "Security logs", threat: "Privileged insider misuse", vuln: "Insufficient security logging", L: 3, I: 3, owner: "IT Security" }
+        { id: "R1", scenario: "Phished administrator credentials", asset: "Authentication service", threat: "Credential phishing", vuln: "No MFA for privileged accounts", L: 4, I: 4, owner: "IT Security", treat: "Mitigate", rL: 2, rI: 4 },
+        { id: "R2", scenario: "Unauthorized access to another student's marks", asset: "Student records", threat: "Malicious access attempt", vuln: "Missing server-side authorization checks", L: 3, I: 5, owner: "App team", treat: "Mitigate", rL: 1, rI: 5 },
+        { id: "R3", scenario: "Unpatched portal component exploited", asset: "Web application", threat: "External exploitation of a web weakness", vuln: "Unpatched software", L: 3, I: 4, owner: "IT Operations", treat: "Mitigate", rL: 1, rI: 4 },
+        { id: "R4", scenario: "Production account accesses backups", asset: "Backup storage", threat: "Ransomware", vuln: "Backups accessible from production accounts", L: 2, I: 5, owner: "IT Operations", treat: "Mitigate", rL: 1, rI: 3 },
+        { id: "R5", scenario: "Insufficient logging to investigate misuse", asset: "Security logs", threat: "Privileged insider misuse", vuln: "Insufficient security logging", L: 3, I: 3, owner: "IT Security", treat: "Mitigate", rL: 2, rI: 3 }
       ],
       actions: [
         { id: "A1", title: "Enforce MFA for privileged accounts", risk: "R1", owner: "IT Security", due: "≤ 7 days", prio: "P1", status: "In progress" },
@@ -376,27 +551,67 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
         { id: "A7", title: "Run incident-response exercises", risk: null, owner: "IT Security", due: "Periodic", prio: "Ongoing", status: "Not started" },
         { id: "A8", title: "Reassess risk after major system changes", risk: null, owner: "Risk lead", due: "After changes", prio: "Ongoing", status: "Not started" }
       ],
-      log: []
+      log: [],
+      trend: []
     };
   }
 
-  var state = load() || seed();
-  var filter = null;        // { L, I } or null
-  var pendingDelete = null; // risk id awaiting confirmation
-  var freshLog = false;
-
+  /* ---------- State, storage and migration ---------- */
+  function clampN(n, d) { n = Math.round(Number(n)); return n >= 1 && n <= 5 ? n : d; }
+  function maxNum(list, prefix) {
+    return list.reduce(function (m, x) { var n = parseInt(String(x.id).replace(prefix, ""), 10); return isNaN(n) ? m : Math.max(m, n); }, 0);
+  }
+  function normalize(s) {
+    if (!s || !Array.isArray(s.risks) || !Array.isArray(s.actions)) return null;
+    var base = seed();
+    s.risks = s.risks.filter(function (r) { return r && r.id; }).map(function (r) {
+      var L = clampN(r.L, 3), I = clampN(r.I, 3);
+      var def = base.risks.find(function (b) { return b.id === r.id && b.scenario === r.scenario; });
+      return {
+        id: String(r.id), scenario: String(r.scenario || "Untitled risk"), asset: r.asset || ASSETS[0], threat: r.threat || "", vuln: r.vuln || "",
+        L: L, I: I, owner: r.owner || OWNERS[0],
+        treat: TREATMENTS.indexOf(r.treat) >= 0 ? r.treat : "Mitigate",
+        rL: clampN(r.rL, def ? def.rL : Math.max(1, L - 1)), rI: clampN(r.rI, def ? def.rI : I)
+      };
+    });
+    s.actions = s.actions.filter(function (a) { return a && a.id; }).map(function (a) {
+      return { id: String(a.id), title: String(a.title || "Untitled action"), risk: a.risk || null, owner: a.owner || OWNERS[0], due: a.due || DUES[2], prio: PRIOS.indexOf(a.prio) >= 0 ? a.prio : "P2", status: STATUSES.indexOf(a.status) >= 0 ? a.status : "Not started" };
+    });
+    s.phase = Math.min(4, Math.max(0, Math.round(Number(s.phase)) || 0));
+    s.log = Array.isArray(s.log) ? s.log.filter(function (e) { return e && e.msg; }) : [];
+    s.trend = Array.isArray(s.trend) ? s.trend.filter(function (p) { return p && isFinite(p.inh) && isFinite(p.res); }) : [];
+    // ID counters never go backwards, so a new risk can't inherit a deleted risk's actions.
+    s.seq = Math.max(Number(s.seq) || 0, maxNum(s.risks, "R"));
+    s.aseq = Math.max(Number(s.aseq) || 0, maxNum(s.actions, "A"));
+    s.v = 2;
+    return s;
+  }
   function load() {
     try {
-      var raw = localStorage.getItem(KEY);
-      if (!raw) return null;
-      var s = JSON.parse(raw);
-      return s && Array.isArray(s.risks) && Array.isArray(s.actions) ? s : null;
+      var raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
+      return raw ? normalize(JSON.parse(raw)) : null;
     } catch (e) { return null; }
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable: page still works for this session */ }
   }
 
+  var state = load() || seed();
+  var ui = {
+    cell: null,          // { L, I } heat-map filter
+    band: null,          // "Critical" | "High" | ...
+    q: "",               // search text
+    view: "inherent",    // heat map view
+    actFilter: "All",
+    pendingDelete: null,
+    editing: null,       // risk id being edited
+    freshLog: false,
+    flashRisk: null,
+    hlRisk: null
+  };
+  var history = [];      // undo snapshots
+
+  /* ---------- Helpers ---------- */
   function band(score) {
     if (score >= 16) return { name: "Critical", cls: "b-crit" };
     if (score >= 10) return { name: "High", cls: "b-high" };
@@ -408,269 +623,785 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
-  function now() {
-    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  function $(id) { return document.getElementById(id); }
+  function fmtTime(d) { return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }); }
+  function fmtDay(d) { return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }); }
+  function opts(list, sel, labels) {
+    return list.map(function (v, i) {
+      var val = Array.isArray(v) ? v[0] : v, lab = Array.isArray(v) ? v[1] : (labels ? labels[i] : v);
+      return '<option value="' + esc(val) + '"' + (String(val) === String(sel) ? " selected" : "") + ">" + esc(lab) + "</option>";
+    }).join("");
   }
   function addLog(msg) {
-    state.log.unshift({ t: now(), msg: msg });
-    if (state.log.length > 60) state.log.length = 60;
-    freshLog = true;
+    state.log.unshift({ t: new Date().toISOString(), msg: msg });
+    if (state.log.length > 120) state.log.length = 120;
+    ui.freshLog = true;
+    lastMsg = msg;
   }
+  function actionsOf(r) { return state.actions.filter(function (a) { return a.risk === r.id; }); }
   function riskStatus(r) {
-    var acts = state.actions.filter(function (a) { return a.risk === r.id; });
+    if (r.treat === "Accept") return "Accepted";
+    var acts = actionsOf(r);
     if (!acts.length) return "Open";
     if (acts.every(function (a) { return a.status === "Verified"; })) return "Verified";
     if (acts.every(function (a) { return a.status === "Done" || a.status === "Verified"; })) return "Implemented";
     if (acts.some(function (a) { return a.status !== "Not started"; })) return "In treatment";
     return "Open";
   }
-  var ST_CLASS = { "Open": "st-open", "In treatment": "st-treat", "Implemented": "st-impl", "Verified": "st-ver" };
+  var ST_CLASS = { "Open": "st-open", "In treatment": "st-treat", "Implemented": "st-impl", "Verified": "st-ver", "Accepted": "st-acc" };
+  // Residual position: the target only counts once treatment is verified; accepted risks keep their inherent score.
+  function current(r) {
+    return riskStatus(r) === "Verified" ? { L: r.rL, I: r.rI } : { L: r.L, I: r.I };
+  }
+  function pos(r) { return ui.view === "residual" ? current(r) : { L: r.L, I: r.I }; }
   function sortedRisks() {
     return state.risks.slice().sort(function (a, b) {
       return (b.L * b.I) - (a.L * a.I) || a.id.localeCompare(b.id, undefined, { numeric: true });
     });
   }
-  function opts(list, sel) {
-    return list.map(function (v) { return "<option" + (String(v) === String(sel) ? " selected" : "") + ">" + esc(v) + "</option>"; }).join("");
+  function exposure() {
+    var inh = 0, res = 0;
+    state.risks.forEach(function (r) { var c = current(r); inh += r.L * r.I; res += c.L * c.I; });
+    return { inh: inh, res: res };
   }
+  function recordTrend() {
+    var e = exposure(), last = state.trend[state.trend.length - 1];
+    if (last && last.inh === e.inh && last.res === e.res) return;
+    state.trend.push({ t: new Date().toISOString(), inh: e.inh, res: e.res, msg: lastMsg || "" });
+    if (state.trend.length > 60) state.trend.splice(0, state.trend.length - 60);
+  }
+
+  /* ---------- Undo ---------- */
+  var lastMsg = "";
+  function snapshot(label) {
+    history.push({ s: JSON.stringify(state), label: label });
+    if (history.length > 40) history.shift();
+    $("undoBtn").disabled = false;
+  }
+  function undo() {
+    var h = history.pop();
+    if (!h) return;
+    var restored = normalize(JSON.parse(h.s));
+    if (!restored) return;
+    state = restored;
+    ui.pendingDelete = null;
+    addLog("Undo: " + h.label);
+    $("undoBtn").disabled = !history.length;
+    commit();
+    hideToast();
+  }
+
+  /* ---------- Toast ---------- */
+  var toastTimer = null;
+  function toast(msg, withUndo) {
+    $("toastMsg").textContent = msg;
+    $("toastUndo").hidden = !withUndo;
+    $("toast").classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 4500);
+  }
+  function hideToast() { $("toast").classList.remove("show"); }
 
   /* ---------- Render ---------- */
   function renderPhase() {
-    document.getElementById("phase").innerHTML = PHASES.map(function (p, i) {
+    $("phase").innerHTML = PHASES.map(function (p, i) {
       var cls = i === state.phase ? "current" : (i < state.phase ? "done" : "");
-      return '<button type="button" data-phase="' + i + '" class="' + cls + '"' + (i === state.phase ? ' aria-current="step"' : "") + '><span class="n">' + (i < state.phase ? "✓" : (i + 1)) + "</span>" + esc(p[0]) + "</button>";
+      return '<button type="button" id="ph-' + i + '" data-phase="' + i + '" class="' + cls + '"' + (i === state.phase ? ' aria-current="step"' : "") + '><span class="n">' + (i < state.phase ? "✓" : (i + 1)) + "</span>" + esc(p[0]) + "</button>";
     }).join("");
-    document.getElementById("phaseDesc").textContent = "Phase " + (state.phase + 1) + " of 5 · " + PHASES[state.phase][1];
+    $("phaseDesc").textContent = "Phase " + (state.phase + 1) + " of 5 · " + PHASES[state.phase][1];
+  }
+
+  function counts(useCurrent) {
+    var c = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    state.risks.forEach(function (r) { var p = useCurrent ? current(r) : r; c[band(p.L * p.I).name]++; });
+    return c;
   }
 
   function renderKpis() {
-    var rs = state.risks;
-    var count = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-    rs.forEach(function (r) { count[band(r.L * r.I).name]++; });
+    var rs = state.risks, inh = counts(false), res = counts(true);
     var top = sortedRisks()[0];
     var total = state.actions.length;
     var done = state.actions.filter(function (a) { return a.status === "Done" || a.status === "Verified"; }).length;
     var ver = state.actions.filter(function (a) { return a.status === "Verified"; }).length;
     var pct = total ? Math.round(done / total * 100) : 0;
     var verifiedRisks = rs.filter(function (r) { return riskStatus(r) === "Verified"; }).length;
+    var ex = exposure();
+    var drop = ex.inh ? Math.round((ex.inh - ex.res) / ex.inh * 100) : 0;
+    function resNote(name) { return res[name] === inh[name] ? "Residual: unchanged" : "Residual: " + res[name] + " after treatment"; }
     var tiles = [
-      { label: "Risks in register", val: rs.length, note: verifiedRisks + " verified as treated" },
-      { label: "Critical", val: count.Critical, note: "Score 16–25", cls: "b-crit" },
-      { label: "High", val: count.High, note: "Score 10–15", cls: "b-high" },
-      { label: "Medium / Low", val: count.Medium + " / " + count.Low, note: "Score 1–9", cls: "b-med" },
-      { label: "Top risk", val: top ? top.L * top.I : "–", note: top ? top.id + " · " + esc(top.scenario) : "No risks recorded" },
+      { label: "Risks in register", val: rs.length, note: verifiedRisks + " verified as treated" + (top ? " · top " + esc(top.id) + " (" + top.L * top.I + ")" : "") },
+      { label: "Critical", val: inh.Critical, note: resNote("Critical"), cls: "b-crit", band: "Critical" },
+      { label: "High", val: inh.High, note: resNote("High"), cls: "b-high", band: "High" },
+      { label: "Medium / Low", val: inh.Medium + " / " + inh.Low, note: "Score 1–9 · residual " + res.Medium + " / " + res.Low, cls: "b-med" },
+      { label: "Risk exposure", val: ex.res + ' <small>/ ' + ex.inh + "</small>" + (drop > 0 ? '<span class="delta down">↓ ' + drop + "%</span>" : '<span class="delta flat">0%</span>'), note: "Residual vs inherent total score" },
       { label: "Actions complete", val: pct + "%", note: done + " of " + total + " done · " + ver + " verified", bar: [ver / (total || 1), (done - ver) / (total || 1)] }
     ];
-    document.getElementById("kpis").innerHTML = tiles.map(function (t) {
+    $("kpis").innerHTML = tiles.map(function (t) {
       var sw = t.cls ? '<span class="sw ' + t.cls + '"></span>' : "";
       var bar = t.bar ? '<div class="bar"><span style="width:' + (t.bar[0] * 100) + '%;background:var(--low)"></span><span style="width:' + (t.bar[1] * 100) + '%;background:var(--gold)"></span></div>' : "";
-      return '<div class="kpi"><div class="label">' + sw + esc(t.label) + '</div><div class="val">' + t.val + '</div><div class="note">' + t.note + "</div>" + bar + "</div>";
+      var inner = '<div class="label">' + sw + esc(t.label) + '</div><div class="val">' + t.val + '</div><div class="note">' + t.note + "</div>" + bar;
+      if (t.band) {
+        var on = ui.band === t.band;
+        return '<button type="button" id="kpi-' + t.band + '" class="kpi ' + t.cls + (on ? " active" : "") + '" data-band="' + t.band + '" aria-pressed="' + on + '" title="Filter the register to ' + t.band + ' risks">' + inner + "</button>";
+      }
+      return '<div class="kpi">' + inner + "</div>";
     }).join("");
   }
 
+  function chipRects() {
+    var m = {};
+    document.querySelectorAll("#matrix .rid").forEach(function (el) { m[el.dataset.rid] = el.getBoundingClientRect(); });
+    return m;
+  }
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   function renderMatrix() {
-    var html = "";
+    var before = chipRects();
+    var residual = ui.view === "residual";
+    var html = '<div class="ytitle">Likelihood</div>';
     for (var L = 5; L >= 1; L--) {
-      if (L === 5) html += '<div class="ytitle">Likelihood</div>';
-      html += '<div class="axn">' + L + "</div>";
+      html += '<div class="axn" style="grid-column:2">' + L + "</div>";
       for (var I = 1; I <= 5; I++) {
         var s = L * I, b = band(s);
-        var here = state.risks.filter(function (r) { return r.L === L && r.I === I; });
-        var sel = filter && filter.L === L && filter.I === I;
+        var here = state.risks.filter(function (r) { var p = pos(r); return p.L === L && p.I === I; });
+        var sel = ui.cell && ui.cell.L === L && ui.cell.I === I;
         var label = "Likelihood " + L + ", impact " + I + ", score " + s + " " + b.name + (here.length ? ", risks " + here.map(function (r) { return r.id; }).join(" ") : ", no risks");
-        html += '<button type="button" class="cell ' + b.cls + (here.length ? " has" : "") + (sel ? " sel" : "") + '" data-l="' + L + '" data-i="' + I + '" aria-pressed="' + sel + '" aria-label="' + esc(label) + '">' +
+        html += '<button type="button" id="cell-' + L + "-" + I + '" class="cell ' + b.cls + (here.length ? " has" : "") + (sel ? " sel" : "") + '" data-l="' + L + '" data-i="' + I + '" aria-pressed="' + sel + '" aria-label="' + esc(label) + '">' +
           '<span class="s">' + s + "</span>" +
-          '<span class="chips">' + here.map(function (r) { return '<span class="rid">' + esc(r.id) + "</span>"; }).join("") + "</span></button>";
+          '<span class="chips">' + here.map(function (r) {
+            var moved = residual && riskStatus(r) === "Verified" && (r.rL !== r.L || r.rI !== r.I);
+            return '<span class="rid' + (moved ? " moved" : "") + '" data-rid="' + esc(r.id) + '"' + (residual ? "" : ' draggable="true"') + ' title="' + esc(r.id + ": " + r.scenario + (moved ? " (moved from " + r.L * r.I + " after verified treatment)" : "")) + '">' + esc(r.id) + "</span>";
+          }).join("") + "</span></button>";
       }
     }
-    html += "<div></div><div></div>";
+    html += '<div style="grid-column:2"></div>';
     for (var c = 1; c <= 5; c++) html += '<div class="axn">' + c + "</div>";
-    html += '<div></div><div></div><div class="xtitle">Impact</div>';
-    document.getElementById("matrix").innerHTML = html;
+    html += '<div class="xtitle">Impact</div>';
+    $("matrix").innerHTML = html;
 
-    var count = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-    state.risks.forEach(function (r) { count[band(r.L * r.I).name]++; });
-    var order = [["Critical", "b-crit"], ["High", "b-high"], ["Medium", "b-med"], ["Low", "b-low"]];
-    document.getElementById("dist").innerHTML = order.map(function (o) {
+    // FLIP: animate chips that changed cell
+    if (!reduceMotion) {
+      document.querySelectorAll("#matrix .rid").forEach(function (el) {
+        var a = before[el.dataset.rid];
+        if (!a) return;
+        var b2 = el.getBoundingClientRect(), dx = a.left - b2.left, dy = a.top - b2.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        el.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 550, easing: "cubic-bezier(.2,.8,.2,1)" });
+      });
+    }
+
+    $("mapHint").textContent = residual
+      ? "Residual view: verified risks move to their target score (green ring). Click a cell to filter the register."
+      : "Inherent view: likelihood × impact before treatment. Click a cell to filter, or drag a risk chip to re-score it.";
+    document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === ui.view)); });
+
+    var count = counts(residual);
+    $("legend").innerHTML = [["Low", "b-low", "1–4"], ["Medium", "b-med", "5–9"], ["High", "b-high", "10–15"], ["Critical", "b-crit", "16–25"]].map(function (o) {
+      return '<button type="button" id="lg-' + o[0] + '" class="' + o[1] + '" data-band="' + o[0] + '" aria-pressed="' + (ui.band === o[0]) + '">' + o[0] + " " + o[2] + "</button>";
+    }).join("");
+    $("dist").innerHTML = BANDS.map(function (o) {
       return '<span class="' + o[1] + '" style="flex-grow:' + count[o[0]] + '"></span>';
     }).join("");
-    document.getElementById("distLabels").innerHTML = order.map(function (o) {
+    $("distLabels").innerHTML = BANDS.map(function (o) {
       return "<span>" + o[0] + " <b>" + count[o[0]] + "</b></span>";
-    }).join("");
+    }).join("") + '<span>(' + (residual ? "residual" : "inherent") + ")</span>";
+  }
+
+  function renderTrend() {
+    var pts = state.trend.slice();
+    var host = $("trend");
+    var W = 380, H = 170, pl = 30, pr = 74, pt = 12, pb = 22;
+    if (!pts.length) { host.innerHTML = '<p class="hint">No data yet.</p>'; return; }
+    if (pts.length === 1) pts = [pts[0], pts[0]];
+    var maxV = Math.max.apply(null, pts.map(function (p) { return p.inh; }).concat([10]));
+    var niceMax = Math.ceil(maxV / 20) * 20;
+    var x = function (i) { return pl + (W - pl - pr) * (i / (pts.length - 1)); };
+    var y = function (v) { return pt + (H - pt - pb) * (1 - v / niceMax); };
+    var grid = "", ticks = 4;
+    for (var g = 0; g <= ticks; g++) {
+      var v = niceMax * g / ticks;
+      grid += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+      grid += '<text x="' + (pl - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + Math.round(v) + "</text>";
+    }
+    var pa = pts.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.inh).toFixed(1); }).join(" ");
+    var pbp = pts.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.res).toFixed(1); }).join(" ");
+    var area = pbp + " L" + x(pts.length - 1).toFixed(1) + " " + y(0) + " L" + x(0).toFixed(1) + " " + y(0) + " Z";
+    var last = pts[pts.length - 1], lx = x(pts.length - 1);
+    var ly1 = y(last.res), ly2 = y(last.inh);
+    if (Math.abs(ly1 - ly2) < 14) { if (ly1 >= ly2) { ly1 = ly2 + 14; } else { ly2 = ly1 + 14; } }
+    host.innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Exposure trend: residual ' + last.res + " of inherent " + last.inh + '">' +
+      '<g class="grid axis">' + grid + "</g>" +
+      '<path class="area" d="' + area + '"/>' +
+      '<path class="s-a" d="' + pa + '"/>' +
+      '<path class="s-b" d="' + pbp + '"/>' +
+      '<circle class="mk" cx="' + lx + '" cy="' + y(last.res) + '" r="4" fill="var(--series-b)"/>' +
+      '<text class="dl" x="' + (lx + 8) + '" y="' + (ly1 + 4) + '">' + last.res + " residual</text>" +
+      '<text class="dl" x="' + (lx + 8) + '" y="' + (ly2 + 4) + '" style="fill:var(--muted)">' + last.inh + " inherent</text>" +
+      '<g class="hover" visibility="hidden"><line class="cross" y1="' + pt + '" y2="' + (H - pb) + '"/><circle class="mk h1" r="4" fill="var(--series-b)"/><circle class="mk h2" r="4" fill="var(--series-a)"/></g>' +
+      '<rect class="hit" x="' + pl + '" y="0" width="' + (W - pl - pr) + '" height="' + H + '"/>' +
+      '<text class="axis" x="' + pl + '" y="' + (H - 4) + '" style="fill:var(--muted);font:500 11px var(--font-mono)">first change</text>' +
+      '<text class="axis" x="' + (W - pr) + '" y="' + (H - 4) + '" text-anchor="end" style="fill:var(--muted);font:500 11px var(--font-mono)">now</text>' +
+      '</svg><div class="tip" hidden></div>';
+    var first = state.trend[0], drop = first.res - last.res;
+    $("trendNote").textContent = state.trend.length + " snapshot" + (state.trend.length === 1 ? "" : "s") + (drop > 0 ? " · −" + drop + " since start" : "");
+
+    var svg = host.querySelector("svg"), hov = host.querySelector(".hover"), tip = host.querySelector(".tip");
+    function move(ev) {
+      var r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+      var i = Math.round((sx - pl) / ((W - pl - pr) / (pts.length - 1)));
+      i = Math.max(0, Math.min(pts.length - 1, i));
+      var p = pts[i], px = x(i);
+      hov.setAttribute("visibility", "visible");
+      hov.querySelector(".cross").setAttribute("x1", px); hov.querySelector(".cross").setAttribute("x2", px);
+      hov.querySelector(".h1").setAttribute("cx", px); hov.querySelector(".h1").setAttribute("cy", y(p.res));
+      hov.querySelector(".h2").setAttribute("cx", px); hov.querySelector(".h2").setAttribute("cy", y(p.inh));
+      var d = new Date(p.t);
+      tip.innerHTML = '<div class="t">' + (isNaN(d) ? "" : fmtTime(d)) + "</div>" +
+        '<div class="row"><span><i class="k" style="background:var(--series-b)"></i>Residual</span><b>' + p.res + "</b></div>" +
+        '<div class="row"><span><i class="k" style="background:var(--series-a)"></i>Inherent</span><b>' + p.inh + "</b></div>" +
+        (p.msg ? '<div class="m">' + esc(p.msg) + "</div>" : "");
+      tip.hidden = false;
+      var tx = px * r.width / W + 12, hostW = host.clientWidth;
+      if (tx + tip.offsetWidth > hostW) tx = px * r.width / W - tip.offsetWidth - 12;
+      tip.style.left = Math.max(0, tx) + "px";
+      tip.style.top = "4px";
+    }
+    function leave() { hov.setAttribute("visibility", "hidden"); tip.hidden = true; }
+    var hit = host.querySelector(".hit");
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", leave);
+  }
+
+  function filteredRisks() {
+    var list = sortedRisks(), q = ui.q.trim().toLowerCase();
+    if (ui.cell) list = list.filter(function (r) { var p = pos(r); return p.L === ui.cell.L && p.I === ui.cell.I; });
+    if (ui.band) list = list.filter(function (r) { var p = ui.view === "residual" ? current(r) : r; return band(p.L * p.I).name === ui.band; });
+    if (q) list = list.filter(function (r) { return [r.id, r.scenario, r.asset, r.owner, r.threat, r.vuln, r.treat].join(" ").toLowerCase().indexOf(q) >= 0; });
+    return list;
   }
 
   function renderRegister() {
-    var list = sortedRisks();
-    var topId = list.length ? list[0].id : null;
-    if (filter) list = list.filter(function (r) { return r.L === filter.L && r.I === filter.I; });
-    var note = document.getElementById("filterNote");
-    if (filter) {
+    var all = sortedRisks();
+    var topId = all.length ? all[0].id : null;
+    var list = filteredRisks();
+    var note = $("filterNote"), parts = [];
+    if (ui.cell) parts.push("likelihood " + ui.cell.L + " × impact " + ui.cell.I + (ui.view === "residual" ? " (residual)" : ""));
+    if (ui.band) parts.push(ui.band + " rating" + (ui.view === "residual" ? " (residual)" : ""));
+    if (ui.q.trim()) parts.push("“" + esc(ui.q.trim()) + "”");
+    if (parts.length) {
       note.hidden = false;
-      note.innerHTML = "Showing risks at likelihood " + filter.L + " × impact " + filter.I + " (" + list.length + ')<button type="button" class="btn quiet small" id="clearFilter">Show all</button>';
+      note.innerHTML = "Showing " + list.length + " of " + all.length + " risks · " + parts.join(" · ") + ' <button type="button" class="btn quiet small" id="clearFilter">Show all</button>';
     } else {
-      note.hidden = true;
-      note.innerHTML = "";
+      note.hidden = true; note.innerHTML = "";
     }
-    var body = document.getElementById("regBody");
+    var body = $("regBody");
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="8" class="hint">' + (filter ? "No risks in this cell. Click the cell again or choose Show all." : "The register is empty. Use Add risk to record the first one.") + "</td></tr>";
+      body.innerHTML = '<tr><td colspan="8" class="hint">' + (parts.length ? "No risks match these filters. Choose Show all to clear them." : "The register is empty. Use Add risk to record the first one.") + "</td></tr>";
       return;
     }
     body.innerHTML = list.map(function (r) {
       var s = r.L * r.I, b = band(s), st = riskStatus(r);
-      var del = pendingDelete === r.id
-        ? '<div class="del-wrap"><button type="button" class="btn danger small" data-confirm="' + esc(r.id) + '">Remove</button><button type="button" class="btn quiet small" data-cancel="1">Keep</button></div>'
-        : '<div class="del-wrap"><button type="button" class="icon-btn" data-del="' + esc(r.id) + '" aria-label="Remove ' + esc(r.id) + '">✕</button></div>';
-      return '<tr class="' + (r.id === topId ? "top" : "") + '">' +
+      var rs = r.rL * r.rI, rb = band(rs), achieved = st === "Verified";
+      var tools = ui.pendingDelete === r.id
+        ? '<div class="row-tools"><button type="button" class="btn danger small" id="cf-' + esc(r.id) + '" data-confirm="' + esc(r.id) + '">Remove</button><button type="button" class="btn quiet small" data-cancel="1">Keep</button></div>'
+        : '<div class="row-tools"><button type="button" class="icon-btn" id="ed-' + esc(r.id) + '" data-edit="' + esc(r.id) + '" aria-label="Edit ' + esc(r.id) + '">Edit</button><button type="button" class="icon-btn" id="del-' + esc(r.id) + '" data-del="' + esc(r.id) + '" aria-label="Remove ' + esc(r.id) + '">✕</button></div>';
+      var nActs = actionsOf(r).length;
+      var resid = r.treat === "Accept"
+        ? '<span class="resid">Retained as is</span>'
+        : '<span class="resid' + (achieved ? " achieved" : "") + '" title="' + (achieved ? "Achieved: all linked actions verified" : "Target once all linked actions are verified") + '">' + '<span>' + (achieved ? "✓ " : "→ ") + rs + '</span><span class="pill ' + rb.cls + (achieved ? "" : " ghost") + '">' + rb.name + "</span></span>";
+      var cls = (r.id === topId ? "top" : "") + (r.id === ui.flashRisk ? " flash" : "");
+      return '<tr class="' + cls + '" data-row="' + esc(r.id) + '">' +
         '<td class="id">' + esc(r.id) + "</td>" +
-        '<td class="scen"><strong>' + esc(r.scenario) + "</strong><small>" + esc(r.asset) + " · " + esc(r.threat || "Threat not recorded") + " + " + esc(r.vuln || "vulnerability not recorded") + "<br>Owner: " + esc(r.owner) + "</small></td>" +
-        '<td><select class="mini" id="L-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="L" aria-label="Likelihood for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.L) + "</select></td>" +
-        '<td><select class="mini" id="I-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="I" aria-label="Impact for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.I) + "</select></td>" +
-        '<td class="score">' + s + " <small>" + r.L + "×" + r.I + "</small></td>" +
-        '<td><span class="pill ' + b.cls + '">' + b.name + "</span></td>" +
+        '<td class="scen"><strong>' + esc(r.scenario) + "</strong><small>" + esc(r.asset) + " · " + esc(r.threat || "Threat not recorded") + " + " + esc(r.vuln || "vulnerability not recorded") + "<br>Owner: " + esc(r.owner) + " · " + nActs + (nActs === 1 ? " action" : " actions") + "</small></td>" +
+        '<td><span class="lxi"><select class="mini" id="L-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="L" aria-label="Likelihood for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.L) + "</select>×" +
+        '<select class="mini" id="I-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="I" aria-label="Impact for ' + esc(r.id) + '">' + opts([1, 2, 3, 4, 5], r.I) + "</select></span></td>" +
+        '<td><span class="inh"><span class="score">' + s + '</span><span class="pill ' + b.cls + '">' + b.name + "</span></span></td>" +
+        '<td><select class="treat" id="T-' + esc(r.id) + '" data-id="' + esc(r.id) + '" data-field="treat" aria-label="Treatment for ' + esc(r.id) + '">' + opts(TREATMENTS, r.treat) + "</select></td>" +
+        "<td>" + resid + "</td>" +
         '<td><span class="st ' + ST_CLASS[st] + '">' + st + "</span></td>" +
-        "<td>" + del + "</td></tr>";
+        "<td>" + tools + "</td></tr>";
     }).join("");
   }
 
   function renderTracker() {
-    var total = state.actions.length;
-    var done = state.actions.filter(function (a) { return a.status === "Done" || a.status === "Verified"; }).length;
-    var ver = state.actions.filter(function (a) { return a.status === "Verified"; }).length;
-    var inprog = state.actions.filter(function (a) { return a.status === "In progress"; }).length;
-    document.getElementById("progress").innerHTML =
-      '<span style="width:' + (ver / (total || 1) * 100) + '%;background:var(--low)"></span>' +
-      '<span style="width:' + ((done - ver) / (total || 1) * 100) + '%;background:var(--gold)"></span>' +
-      '<span style="width:' + (inprog / (total || 1) * 100) + '%;background:var(--info)"></span>';
-    document.getElementById("progText").innerHTML =
-      "<span>Verified <b>" + ver + "</b></span><span>Done, awaiting verification <b>" + (done - ver) + "</b></span><span>In progress <b>" + inprog + "</b></span><span>Not started <b>" + (total - done - inprog) + "</b></span>";
-    document.getElementById("actions").innerHTML = state.actions.map(function (a) {
-      var linked = a.risk ? (state.risks.some(function (r) { return r.id === a.risk; }) ? "linked to " + esc(a.risk) : "linked risk removed") : "applies to all risks";
-      return '<li class="action s-' + a.status.replace(/\s/g, "") + '">' +
+    var acts = state.actions;
+    var total = acts.length;
+    var by = { "Not started": 0, "In progress": 0, "Done": 0, "Verified": 0 };
+    acts.forEach(function (a) { by[a.status]++; });
+    var pct = function (n) { return (n / (total || 1) * 100) + "%"; };
+    $("progress").innerHTML =
+      '<span style="width:' + pct(by.Verified) + ';background:var(--low)"></span>' +
+      '<span style="width:' + pct(by.Done) + ';background:var(--gold)"></span>' +
+      '<span style="width:' + pct(by["In progress"]) + ';background:var(--info)"></span>';
+    $("progText").innerHTML =
+      '<span><i style="background:var(--low)"></i>Verified <b>' + by.Verified + '</b></span><span><i style="background:var(--gold)"></i>Done, awaiting verification <b>' + by.Done + '</b></span><span><i style="background:var(--info)"></i>In progress <b>' + by["In progress"] + '</b></span><span><i style="background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)"></i>Not started <b>' + by["Not started"] + "</b></span>";
+
+    $("actFilter").innerHTML = ["All", "Open", "Done", "Verified"].map(function (f) {
+      return '<button type="button" id="af-' + f + '" data-actfilter="' + f + '" aria-pressed="' + (ui.actFilter === f) + '">' + f + "</button>";
+    }).join("");
+
+    var shown = acts.filter(function (a) {
+      if (ui.actFilter === "Open") return a.status === "Not started" || a.status === "In progress";
+      if (ui.actFilter === "Done") return a.status === "Done";
+      if (ui.actFilter === "Verified") return a.status === "Verified";
+      return true;
+    });
+    if (!shown.length) {
+      $("actions").innerHTML = '<li class="empty hint">' + (total ? "No actions with this status." : "No remediation actions yet. Use Add action.") + "</li>";
+      return;
+    }
+    $("actions").innerHTML = shown.map(function (a) {
+      var linkedRisk = a.risk ? state.risks.find(function (r) { return r.id === a.risk; }) : null;
+      var linked = a.risk ? (linkedRisk ? "linked to " + esc(a.risk) : '<span class="warn">linked risk ' + esc(a.risk) + " removed</span>") : "applies to all risks";
+      var hl = ui.hlRisk && a.risk === ui.hlRisk;
+      return '<li class="action s-' + a.status.replace(/\s/g, "") + (hl ? " hl" : "") + '" data-actrow="' + esc(a.id) + '">' +
         '<span class="prio prio-' + esc(a.prio) + '">' + esc(a.prio) + "</span>" +
-        '<div><div class="title">' + esc(a.title) + '</div><div class="meta">' + esc(a.owner) + " · " + esc(a.due) + " · " + linked + "</div></div>" +
-        '<select id="act-' + esc(a.id) + '" data-act="' + esc(a.id) + '" aria-label="Status of ' + esc(a.title) + '">' + opts(STATUSES, a.status) + "</select></li>";
+        '<div><div class="title">' + esc(a.title) + '</div><div class="meta">' + esc(a.id) + " · " + esc(a.owner) + " · " + esc(a.due) + " · " + linked + "</div></div>" +
+        '<select id="act-' + esc(a.id) + '" data-act="' + esc(a.id) + '" aria-label="Status of ' + esc(a.title) + '">' + opts(STATUSES, a.status) + "</select>" +
+        '<button type="button" class="icon-btn" id="adel-' + esc(a.id) + '" data-actdel="' + esc(a.id) + '" aria-label="Remove action ' + esc(a.id) + '">✕</button></li>';
     }).join("");
   }
 
   function renderLog() {
-    var ul = document.getElementById("log");
-    ul.innerHTML = state.log.map(function (e, i) {
-      return '<li class="' + (i === 0 && freshLog ? "fresh" : "") + '"><time>' + esc(e.t) + "</time><span>" + esc(e.msg) + "</span></li>";
-    }).join("");
-    document.getElementById("logCount").textContent = state.log.length + (state.log.length === 1 ? " event" : " events");
-    freshLog = false;
+    var today = fmtDay(new Date()), lastDay = null, html = "";
+    state.log.forEach(function (e, i) {
+      var d = new Date(e.t), valid = !isNaN(d) && /T/.test(e.t);
+      var day = valid ? fmtDay(d) : null;
+      if (valid && day !== lastDay) {
+        if (!(lastDay === null && day === today)) html += '<li><span class="day">' + (day === today ? "Today" : esc(day)) + "</span></li>";
+        lastDay = day;
+      }
+      html += '<li class="' + (i === 0 && ui.freshLog ? "fresh" : "") + '"><time' + (valid ? ' datetime="' + esc(e.t) + '" title="' + esc(d.toLocaleString()) + '"' : "") + ">" + esc(valid ? fmtTime(d) : e.t) + "</time><span>" + esc(e.msg) + "</span></li>";
+    });
+    $("log").innerHTML = html;
+    $("logCount").textContent = state.log.length + (state.log.length === 1 ? " event" : " events");
+    ui.freshLog = false;
   }
 
   function render() {
-    renderPhase(); renderKpis(); renderMatrix(); renderRegister(); renderTracker(); renderLog();
+    var active = document.activeElement, focusId = active && active.id;
+    renderPhase(); renderKpis(); renderMatrix(); renderTrend(); renderRegister(); renderTracker(); renderLog();
+    // Re-rendering replaces controls; put keyboard focus back where it was.
+    if (focusId && document.activeElement !== active) {
+      var el = $(focusId);
+      if (el) el.focus({ preventScroll: true });
+    }
+    ui.flashRisk = null;
   }
-  function commit() { save(); render(); }
+  function commit() { recordTrend(); save(); render(); }
+
+  /* ---------- Mutations ---------- */
+  function setActionStatus(a, status) {
+    if (!a || a.status === status) return;
+    var linked = a.risk ? state.risks.find(function (x) { return x.id === a.risk; }) : null;
+    var stBefore = linked ? riskStatus(linked) : null;
+    snapshot(a.id + " status change");
+    var old = a.status;
+    a.status = status;
+    var msg = a.id + " “" + a.title + "”: " + old + " → " + a.status;
+    if (linked) {
+      var stAfter = riskStatus(linked);
+      if (stAfter !== stBefore) {
+        msg += " · " + linked.id + " now " + stAfter;
+        if (stAfter === "Verified" && linked.treat !== "Accept") msg += " (residual " + linked.L * linked.I + " → " + linked.rL * linked.rI + ")";
+        ui.flashRisk = linked.id;
+      }
+    }
+    addLog(msg);
+    commit();
+  }
+  function setRiskField(r, f, value) {
+    var before = r[f];
+    if (String(before) === String(value)) return;
+    snapshot(r.id + " " + f + " change");
+    if (f === "treat") {
+      r.treat = value;
+      addLog(r.id + " treatment " + before + " → " + value + (value === "Accept" ? " · risk retained at score " + r.L * r.I : ""));
+    } else {
+      var oldS = r.L * r.I, oldB = band(oldS).name;
+      r[f] = Number(value);
+      // keep the target residual no worse than the inherent score
+      if (r.rL > r.L) r.rL = r.L;
+      if (r.rI > r.I) r.rI = r.I;
+      var newS = r.L * r.I, newB = band(newS).name;
+      addLog(r.id + " " + (f === "L" ? "likelihood" : "impact") + " " + before + " → " + r[f] + " · score " + oldS + " → " + newS + (oldB !== newB ? " (" + oldB + " → " + newB + ")" : ""));
+    }
+    ui.flashRisk = r.id;
+    commit();
+  }
+  function moveRisk(id, L, I) {
+    var r = state.risks.find(function (x) { return x.id === id; });
+    if (!r || (r.L === L && r.I === I)) return;
+    snapshot(r.id + " moved on heat map");
+    var oldS = r.L * r.I, oldB = band(oldS).name;
+    var oldL = r.L, oldI = r.I;
+    r.L = L; r.I = I;
+    if (r.rL > r.L) r.rL = r.L;
+    if (r.rI > r.I) r.rI = r.I;
+    var newS = L * I, newB = band(newS).name;
+    addLog(r.id + " re-scored on heat map " + oldL + "×" + oldI + " → " + L + "×" + I + " · score " + oldS + " → " + newS + (oldB !== newB ? " (" + oldB + " → " + newB + ")" : ""));
+    ui.flashRisk = r.id;
+    commit();
+  }
 
   /* ---------- Events ---------- */
   document.addEventListener("change", function (e) {
     var t = e.target;
     if (t.dataset.field) {
       var r = state.risks.find(function (x) { return x.id === t.dataset.id; });
-      if (!r) return;
-      var f = t.dataset.field, before = r[f], oldS = r.L * r.I, oldB = band(oldS).name;
-      r[f] = Number(t.value);
-      var newS = r.L * r.I, newB = band(newS).name;
-      addLog(r.id + " " + (f === "L" ? "likelihood" : "impact") + " " + before + " → " + r[f] + " · score " + oldS + " → " + newS + (oldB !== newB ? " (" + oldB + " → " + newB + ")" : ""));
-      commit();
+      if (r) setRiskField(r, t.dataset.field, t.value);
     } else if (t.dataset.act) {
-      var a = state.actions.find(function (x) { return x.id === t.dataset.act; });
-      if (!a) return;
-      var linked = a.risk ? state.risks.find(function (x) { return x.id === a.risk; }) : null;
-      var stBefore = linked ? riskStatus(linked) : null;
-      var old = a.status;
-      a.status = t.value;
-      var msg = a.id + " \"" + a.title + "\": " + old + " → " + a.status;
-      if (linked) {
-        var stAfter = riskStatus(linked);
-        if (stAfter !== stBefore) msg += " · " + linked.id + " now " + stAfter;
-      }
-      addLog(msg);
-      commit();
+      setActionStatus(state.actions.find(function (x) { return x.id === t.dataset.act; }), t.value);
     }
   });
 
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
-    if (!t) return;
+    if (!t || t.closest("form") && t.type === "submit") return;
     if (t.dataset.phase !== undefined) {
       var p = Number(t.dataset.phase);
       if (p !== state.phase) {
+        snapshot("audit phase change");
         addLog("Audit phase moved to " + (p + 1) + ": " + PHASES[p][0]);
         state.phase = p;
         commit();
       }
     } else if (t.classList.contains("cell")) {
       var L = Number(t.dataset.l), I = Number(t.dataset.i);
-      filter = filter && filter.L === L && filter.I === I ? null : { L: L, I: I };
+      ui.cell = ui.cell && ui.cell.L === L && ui.cell.I === I ? null : { L: L, I: I };
       render();
+    } else if (t.dataset.view) {
+      if (ui.view !== t.dataset.view) { ui.view = t.dataset.view; ui.cell = null; render(); }
+    } else if (t.dataset.band) {
+      ui.band = ui.band === t.dataset.band ? null : t.dataset.band;
+      render();
+    } else if (t.dataset.actfilter) {
+      ui.actFilter = t.dataset.actfilter; renderTracker();
     } else if (t.id === "clearFilter") {
-      filter = null; render();
+      clearFilters();
     } else if (t.dataset.del) {
-      pendingDelete = t.dataset.del; renderRegister();
+      ui.pendingDelete = t.dataset.del; renderRegister();
+      var cf = $("cf-" + t.dataset.del); if (cf) cf.focus();
     } else if (t.dataset.cancel) {
-      pendingDelete = null; renderRegister();
+      var keepId = ui.pendingDelete;
+      ui.pendingDelete = null; renderRegister();
+      var d = $("del-" + keepId); if (d) d.focus();
     } else if (t.dataset.confirm) {
       var id = t.dataset.confirm;
+      var linkedActs = state.actions.filter(function (a) { return a.risk === id; });
+      snapshot("removal of " + id);
       state.risks = state.risks.filter(function (r) { return r.id !== id; });
-      pendingDelete = null;
-      addLog(id + " removed from the register");
+      state.actions = state.actions.filter(function (a) { return a.risk !== id; });
+      ui.pendingDelete = null;
+      if (ui.editing === id) setForm(false);
+      addLog(id + " removed from the register" + (linkedActs.length ? " with " + linkedActs.length + " linked action" + (linkedActs.length === 1 ? "" : "s") : ""));
       commit();
+      toast(id + " removed", true);
+    } else if (t.dataset.edit) {
+      openEdit(t.dataset.edit);
+    } else if (t.dataset.actdel) {
+      var aid = t.dataset.actdel, act = state.actions.find(function (a) { return a.id === aid; });
+      if (!act) return;
+      snapshot("removal of action " + aid);
+      state.actions = state.actions.filter(function (a) { return a.id !== aid; });
+      addLog(aid + " “" + act.title + "” removed");
+      commit();
+      toast("Action " + aid + " removed", true);
     }
   });
 
-  // Add-risk form
-  var form = document.getElementById("addForm");
-  var toggle = document.getElementById("addToggle");
-  document.getElementById("fAsset").innerHTML = opts(ASSETS, ASSETS[0]);
-  document.getElementById("fOwner").innerHTML = opts(OWNERS, OWNERS[0]);
+  // Hovering a register row highlights its actions in the tracker
+  $("regBody").addEventListener("mouseover", function (e) {
+    var tr = e.target.closest("tr[data-row]"), id = tr ? tr.dataset.row : null;
+    if (id === ui.hlRisk) return;
+    ui.hlRisk = id;
+    document.querySelectorAll(".action").forEach(function (li) {
+      var a = state.actions.find(function (x) { return x.id === li.dataset.actrow; });
+      li.classList.toggle("hl", !!(id && a && a.risk === id));
+    });
+  });
+  $("regBody").addEventListener("mouseleave", function () {
+    ui.hlRisk = null;
+    document.querySelectorAll(".action.hl").forEach(function (li) { li.classList.remove("hl"); });
+  });
+
+  function clearFilters() { ui.cell = null; ui.band = null; ui.q = ""; $("search").value = ""; render(); }
+  $("search").addEventListener("input", function () { ui.q = this.value; renderRegister(); });
+
+  /* Drag & drop risk chips on the heat map */
+  var dragId = null;
+  $("matrix").addEventListener("dragstart", function (e) {
+    var chip = e.target.closest && e.target.closest(".rid");
+    if (!chip || ui.view !== "inherent") { e.preventDefault(); return; }
+    dragId = chip.dataset.rid;
+    chip.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", dragId); } catch (err) { /* some browsers restrict */ }
+  });
+  $("matrix").addEventListener("dragend", function () {
+    dragId = null;
+    document.querySelectorAll(".rid.dragging, .cell.drop").forEach(function (el) { el.classList.remove("dragging", "drop"); });
+  });
+  $("matrix").addEventListener("dragover", function (e) {
+    var cell = e.target.closest(".cell");
+    if (!cell || !dragId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".cell.drop").forEach(function (el) { if (el !== cell) el.classList.remove("drop"); });
+    cell.classList.add("drop");
+  });
+  $("matrix").addEventListener("dragleave", function (e) {
+    var cell = e.target.closest(".cell");
+    if (cell && !cell.contains(e.relatedTarget)) cell.classList.remove("drop");
+  });
+  $("matrix").addEventListener("drop", function (e) {
+    var cell = e.target.closest(".cell");
+    if (!cell || !dragId) return;
+    e.preventDefault();
+    var id = dragId; dragId = null;
+    moveRisk(id, Number(cell.dataset.l), Number(cell.dataset.i));
+  });
+
+  /* ---------- Risk form (add + edit) ---------- */
+  var form = $("addForm"), toggle = $("addToggle");
+  $("fAsset").innerHTML = opts(ASSETS, ASSETS[0]);
+  $("fOwner").innerHTML = opts(OWNERS, OWNERS[0]);
+  $("fTreat").innerHTML = opts(TREATMENTS.map(function (t) { return [t, t + " (" + TREAT_HINT[t] + ")"]; }), "Mitigate");
   function setForm(open) {
     form.hidden = !open;
     toggle.setAttribute("aria-expanded", String(open));
     toggle.textContent = open ? "Close form" : "Add risk";
-    if (open) { updatePreview(); document.getElementById("fScenario").focus(); }
+    if (!open) { ui.editing = null; form.reset(); $("fErr").hidden = true; }
+    if (open) { updatePreview(); $("fScenario").focus(); }
+  }
+  function openEdit(id) {
+    var r = state.risks.find(function (x) { return x.id === id; });
+    if (!r) return;
+    ui.editing = id;
+    $("formTitle").textContent = "Edit " + r.id;
+    $("fSubmit").textContent = "Save changes";
+    $("fActionWrap").hidden = true;
+    $("fScenario").value = r.scenario;
+    $("fAsset").value = r.asset;
+    if ($("fAsset").value !== r.asset) { $("fAsset").insertAdjacentHTML("beforeend", opts([r.asset], r.asset)); $("fAsset").value = r.asset; }
+    $("fOwner").value = r.owner;
+    $("fThreat").value = r.threat; $("fVuln").value = r.vuln;
+    $("fL").value = r.L; $("fI").value = r.I;
+    $("fTreat").value = r.treat; $("fRL").value = r.rL; $("fRI").value = r.rI;
+    setForm(true);
+    form.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  }
+  function openAdd() {
+    ui.editing = null;
+    $("fRL").max = 5; $("fRI").max = 5;
+    form.reset();
+    $("formTitle").textContent = "New risk";
+    $("fSubmit").textContent = "Add to register";
+    $("fActionWrap").hidden = false;
+    setForm(true);
   }
   function updatePreview() {
-    var L = Number(document.getElementById("fL").value), I = Number(document.getElementById("fI").value);
-    document.getElementById("fLv").textContent = L;
-    document.getElementById("fIv").textContent = I;
-    var s = L * I, b = band(s);
-    document.getElementById("fPreview").innerHTML = '<span class="hint">Live score</span><span class="score">' + L + " × " + I + " = " + s + '</span><span class="pill ' + b.cls + '">' + b.name + "</span>";
+    var L = Number($("fL").value), I = Number($("fI").value);
+    // target residual can't exceed inherent
+    var RLin = $("fRL"), RIin = $("fRI");
+    RLin.max = L; RIin.max = I;
+    if (Number(RLin.value) > L) RLin.value = L;
+    if (Number(RIin.value) > I) RIin.value = I;
+    var RL = Number(RLin.value), RI = Number(RIin.value), accept = $("fTreat").value === "Accept";
+    RLin.disabled = RIin.disabled = accept;
+    $("fLv").textContent = L; $("fIv").textContent = I;
+    $("fRLv").textContent = accept ? L : RL; $("fRIv").textContent = accept ? I : RI;
+    var s = L * I, b = band(s), rs = accept ? s : RL * RI, rb = band(rs);
+    $("fPreview").innerHTML = '<span class="hint">Inherent</span><span class="score">' + L + " × " + I + " = " + s + '</span><span class="pill ' + b.cls + '">' + b.name + "</span>" +
+      '<span class="hint" style="margin-left:8px">Target residual</span><span class="score">' + rs + '</span><span class="pill ghost ' + rb.cls + '">' + rb.name + "</span>";
   }
-  toggle.addEventListener("click", function () { setForm(form.hidden); });
-  document.getElementById("addCancel").addEventListener("click", function () { setForm(false); });
-  document.getElementById("fL").addEventListener("input", updatePreview);
-  document.getElementById("fI").addEventListener("input", updatePreview);
+  toggle.addEventListener("click", function () { if (form.hidden) openAdd(); else setForm(false); });
+  $("addCancel").addEventListener("click", function () { setForm(false); toggle.focus(); });
+  ["fL", "fI", "fRL", "fRI"].forEach(function (id) { $(id).addEventListener("input", updatePreview); });
+  $("fTreat").addEventListener("change", updatePreview);
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    var scen = document.getElementById("fScenario").value.trim();
-    var err = document.getElementById("fErr");
-    if (!scen) { err.hidden = false; document.getElementById("fScenario").focus(); return; }
+    var scen = $("fScenario").value.trim();
+    var err = $("fErr");
+    if (!scen) { err.hidden = false; $("fScenario").focus(); return; }
     err.hidden = true;
-    var next = state.risks.reduce(function (m, r) { var n = parseInt(String(r.id).slice(1), 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1;
-    var r = {
-      id: "R" + next, scenario: scen,
-      asset: document.getElementById("fAsset").value,
-      threat: document.getElementById("fThreat").value.trim(),
-      vuln: document.getElementById("fVuln").value.trim(),
-      L: Number(document.getElementById("fL").value), I: Number(document.getElementById("fI").value),
-      owner: document.getElementById("fOwner").value
+    var L = Number($("fL").value), I = Number($("fI").value), treat = $("fTreat").value;
+    var data = {
+      scenario: scen, asset: $("fAsset").value, threat: $("fThreat").value.trim(), vuln: $("fVuln").value.trim(),
+      L: L, I: I, owner: $("fOwner").value, treat: treat,
+      rL: treat === "Accept" ? L : Math.min(L, Number($("fRL").value)), rI: treat === "Accept" ? I : Math.min(I, Number($("fRI").value))
     };
-    state.risks.push(r);
-    var s = r.L * r.I;
-    addLog(r.id + " added: \"" + r.scenario + "\" · " + r.L + " × " + r.I + " = " + s + " (" + band(s).name + ")");
-    form.reset();
+    if (ui.editing) {
+      var r = state.risks.find(function (x) { return x.id === ui.editing; });
+      if (r) {
+        snapshot("edit of " + r.id);
+        var changed = Object.keys(data).filter(function (k) { return String(r[k]) !== String(data[k]); });
+        Object.keys(data).forEach(function (k) { r[k] = data[k]; });
+        addLog(r.id + " edited" + (changed.length ? " (" + changed.map(function (k) { return { scenario: "scenario", asset: "asset", threat: "threat", vuln: "vulnerability", L: "likelihood", I: "impact", owner: "owner", treat: "treatment", rL: "target likelihood", rI: "target impact" }[k]; }).join(", ") + ")" : ", no changes"));
+        ui.flashRisk = r.id;
+      }
+    } else {
+      snapshot("adding a risk");
+      state.seq += 1;
+      var nr = Object.assign({ id: "R" + state.seq }, data);
+      state.risks.push(nr);
+      var s = L * I;
+      var actTitle = $("fAction").value.trim();
+      var extra = "";
+      if (actTitle && treat !== "Accept") {
+        state.aseq += 1;
+        var s2 = s >= 16 ? "P1" : s >= 10 ? "P1" : s >= 5 ? "P2" : "P3";
+        state.actions.push({ id: "A" + state.aseq, title: actTitle, risk: nr.id, owner: nr.owner, due: s2 === "P1" ? "≤ 14 days" : "≤ 30 days", prio: s2, status: "Not started" });
+        extra = " with action A" + state.aseq;
+      }
+      addLog(nr.id + " added: “" + nr.scenario + "” · " + L + " × " + I + " = " + s + " (" + band(s).name + ")" + extra);
+      ui.flashRisk = nr.id;
+    }
     setForm(false);
     commit();
   });
 
-  // Reset with in-page confirmation
-  var resetBtn = document.getElementById("resetBtn"), resetTimer = null;
+  /* ---------- Action form ---------- */
+  var aForm = $("actForm"), aToggle = $("addActToggle");
+  $("aOwner").innerHTML = opts(OWNERS, OWNERS[0]);
+  $("aPrio").innerHTML = opts(PRIOS, "P2");
+  $("aDue").innerHTML = opts(DUES, "≤ 30 days");
+  function setActForm(open) {
+    aForm.hidden = !open;
+    aToggle.setAttribute("aria-expanded", String(open));
+    aToggle.textContent = open ? "Close form" : "Add action";
+    if (open) {
+      $("aRisk").innerHTML = opts([["", "All risks (general control)"]].concat(sortedRisks().map(function (r) { return [r.id, r.id + " · " + r.scenario]; })), sortedRisks()[0] ? sortedRisks()[0].id : "");
+      $("aTitle").focus();
+    } else { aForm.reset(); $("aErr").hidden = true; }
+  }
+  aToggle.addEventListener("click", function () { setActForm(aForm.hidden); });
+  $("actCancel").addEventListener("click", function () { setActForm(false); aToggle.focus(); });
+  $("aRisk").addEventListener("change", function () {
+    var r = state.risks.find(function (x) { return x.id === $("aRisk").value; });
+    if (r) { $("aOwner").value = r.owner; var s = r.L * r.I; $("aPrio").value = s >= 10 ? "P1" : s >= 5 ? "P2" : "P3"; }
+  });
+  aForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var title = $("aTitle").value.trim();
+    if (!title) { $("aErr").hidden = false; $("aTitle").focus(); return; }
+    snapshot("adding an action");
+    state.aseq += 1;
+    var a = { id: "A" + state.aseq, title: title, risk: $("aRisk").value || null, owner: $("aOwner").value, due: $("aDue").value, prio: $("aPrio").value, status: "Not started" };
+    var linked = a.risk ? state.risks.find(function (r) { return r.id === a.risk; }) : null;
+    var wasVerified = linked && riskStatus(linked) === "Verified";
+    state.actions.push(a);
+    addLog(a.id + " added: “" + a.title + "”" + (linked ? " for " + linked.id + (wasVerified ? " · " + linked.id + " reopened until this is verified" : "") : " (all risks)"));
+    if (ui.actFilter !== "All" && ui.actFilter !== "Open") ui.actFilter = "All";
+    setActForm(false);
+    commit();
+  });
+
+  /* ---------- Export & print ---------- */
+  $("csvBtn").addEventListener("click", function () {
+    var head = ["ID", "Scenario", "Asset", "Threat", "Vulnerability", "Owner", "Likelihood", "Impact", "Inherent score", "Inherent rating", "Treatment", "Target likelihood", "Target impact", "Target residual score", "Target residual rating", "Status", "Current score", "Linked actions"];
+    var rows = sortedRisks().map(function (r) {
+      var c = current(r);
+      return [r.id, r.scenario, r.asset, r.threat, r.vuln, r.owner, r.L, r.I, r.L * r.I, band(r.L * r.I).name, r.treat, r.rL, r.rI, r.rL * r.rI, band(r.rL * r.rI).name, riskStatus(r), c.L * c.I,
+        actionsOf(r).map(function (a) { return a.id + " " + a.title + " [" + a.status + "]"; }).join("; ")];
+    });
+    var csv = [head].concat(rows).map(function (row) {
+      return row.map(function (v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",");
+    }).join("\r\n");
+    var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "risk-register-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    addLog("Risk register exported as CSV (" + rows.length + " risks)");
+    commit();
+  });
+  $("printBtn").addEventListener("click", function () { window.print(); });
+
+  /* ---------- Theme ---------- */
+  var THEMES = ["auto", "light", "dark"];
+  function applyTheme(t) {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    $("themeBtn").textContent = "Theme: " + t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  var theme = "auto";
+  try { theme = localStorage.getItem(THEME_KEY) || "auto"; } catch (e) { /* ignore */ }
+  if (THEMES.indexOf(theme) < 0) theme = "auto";
+  applyTheme(theme);
+  $("themeBtn").addEventListener("click", function () {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    applyTheme(theme);
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* ignore */ }
+  });
+
+  /* ---------- Guided demo ---------- */
+  var play = null;
+  function demoSteps() {
+    var A = function (id) { return state.actions.find(function (a) { return a.id === id; }); };
+    var steps = [
+      function () { if (state.phase !== 3) { snapshot("audit phase change"); addLog("Audit phase moved to 4: " + PHASES[3][0]); state.phase = 3; commit(); } },
+      function () { ui.view = "residual"; ui.cell = null; render(); }
+    ];
+    [["A1", "Done"], ["A3", "Verified"], ["A1", "Verified"], ["A2", "In progress"], ["A2", "Done"], ["A4", "In progress"],
+     ["A2", "Verified"], ["A4", "Done"], ["A5", "In progress"], ["A4", "Verified"], ["A5", "Done"], ["A6", "In progress"]].forEach(function (s) {
+      steps.push(function () {
+        var a = A(s[0]);
+        if (!a) return;
+        var order = STATUSES.indexOf(a.status), target = STATUSES.indexOf(s[1]);
+        if (order < target) setActionStatus(a, s[1]);
+      });
+    });
+    steps.push(function () { if (state.phase !== 4) { snapshot("audit phase change"); addLog("Audit phase moved to 5: " + PHASES[4][0]); state.phase = 4; commit(); } });
+    return steps;
+  }
+  function stopPlay(finished) {
+    if (!play) return;
+    clearTimeout(play.timer);
+    play = null;
+    var b = $("playBtn");
+    b.classList.remove("running");
+    b.textContent = "▶ Play demo";
+    if (finished) {
+      var ex = exposure();
+      toast("Demo complete · exposure " + ex.inh + " → " + ex.res, false);
+    }
+  }
+  function startPlay() {
+    var steps = demoSteps(), i = 0;
+    play = { timer: null };
+    var b = $("playBtn");
+    b.classList.add("running");
+    b.textContent = "■ Stop demo";
+    addLog("Guided demo started: follow-up of corrective actions");
+    commit();
+    (function next() {
+      if (!play) return;
+      if (i >= steps.length) { stopPlay(true); return; }
+      steps[i++]();
+      play.timer = setTimeout(next, 1300);
+    })();
+  }
+  $("playBtn").addEventListener("click", function () { if (play) stopPlay(false); else startPlay(); });
+
+  /* ---------- Undo, reset, keyboard ---------- */
+  $("undoBtn").addEventListener("click", undo);
+  $("toastUndo").addEventListener("click", undo);
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target.tagName || "").toLowerCase(), typing = tag === "input" || tag === "textarea" || e.target.isContentEditable;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); undo(); }
+    else if (e.key === "/" && !typing && tag !== "select") { e.preventDefault(); $("search").focus(); }
+    else if (e.key === "Escape") {
+      if (!form.hidden) { setForm(false); toggle.focus(); }
+      else if (!aForm.hidden) { setActForm(false); aToggle.focus(); }
+      else if (ui.pendingDelete) { ui.pendingDelete = null; renderRegister(); }
+      else if (ui.cell || ui.band || ui.q) clearFilters();
+    }
+  });
+
+  var resetBtn = $("resetBtn"), resetTimer = null;
   resetBtn.addEventListener("click", function () {
     if (!resetBtn.classList.contains("armed")) {
       resetBtn.classList.add("armed");
@@ -679,20 +1410,33 @@ select.mini { font: 500 14px var(--font-mono); padding: 4px 6px; border: 1px sol
       return;
     }
     clearTimeout(resetTimer);
+    stopPlay(false);
     resetBtn.classList.remove("armed");
     resetBtn.textContent = "Reset demo data";
-    state = seed(); filter = null; pendingDelete = null;
+    snapshot("reset");
+    state = seed(); ui.cell = null; ui.band = null; ui.q = ""; ui.pendingDelete = null; ui.view = "inherent"; $("search").value = "";
+    setForm(false); setActForm(false);
     addLog("Demo data reset to the hypothetical case study");
     commit();
+    toast("Demo data reset", true);
+  });
+
+  // Keep several open tabs (e.g. presenter + projector) in sync
+  window.addEventListener("storage", function (e) {
+    if (e.key === KEY && e.newValue) {
+      try { var s = normalize(JSON.parse(e.newValue)); if (s) { state = s; render(); } } catch (err) { /* ignore */ }
+    } else if (e.key === THEME_KEY) {
+      theme = e.newValue || "auto"; applyTheme(theme);
+    }
   });
 
   // Live clock
-  var clock = document.getElementById("clock");
-  function tick() { clock.textContent = now(); }
+  var clock = $("clock");
+  function tick() { clock.textContent = fmtTime(new Date()); }
   tick(); setInterval(tick, 1000);
 
   if (!state.log.length) addLog("Dashboard loaded with the hypothetical case-study data (R1–R5)");
-  else addLog("Session resumed");
+  if (!state.trend.length) lastMsg = "Baseline";
   commit();
 })();
 </script>

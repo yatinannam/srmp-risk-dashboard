@@ -21,24 +21,35 @@ The study walks through the four syllabus units:
 
 ### Sample risk register
 
-| ID | Scenario | Likelihood × Impact | Rating |
-|---|---|---|---|
-| R1 | Phished administrator credentials | 4 × 4 = 16 | Critical |
-| R2 | Unauthorized access to another student's marks | 3 × 5 = 15 | High |
-| R3 | Unpatched portal component exploited | 3 × 4 = 12 | High |
-| R4 | Production account accesses backups | 2 × 5 = 10 | High |
-| R5 | Insufficient logging to investigate misuse | 3 × 3 = 9 | Medium |
+| ID | Scenario | Likelihood × Impact | Rating | Target residual |
+|---|---|---|---|---|
+| R1 | Phished administrator credentials | 4 × 4 = 16 | Critical | 2 × 4 = 8 (Medium) |
+| R2 | Unauthorized access to another student's marks | 3 × 5 = 15 | High | 1 × 5 = 5 (Medium) |
+| R3 | Unpatched portal component exploited | 3 × 4 = 12 | High | 1 × 4 = 4 (Low) |
+| R4 | Production account accesses backups | 2 × 5 = 10 | High | 1 × 3 = 3 (Low) |
+| R5 | Insufficient logging to investigate misuse | 3 × 3 = 9 | Medium | 2 × 3 = 6 (Medium) |
 
 Score bands: Low 1–4, Medium 5–9, High 10–15, Critical 16–25.
 
 ## Using the dashboard
 
-- **Heat map:** click a cell to filter the risk register.
-- **Risk register:** change likelihood or impact and every score, rating and count updates live. Add or remove risks.
-- **Remediation tracker:** move actions through Not started, In progress, Done and Verified. A risk counts as treated only when all its linked actions are verified.
+- **Play demo:** walks through the audit follow-up automatically. Actions move to Verified one by one, risks drop to their residual scores on the heat map, and the exposure trend falls. Click again to stop.
+- **Heat map:** switch between **Inherent** (before treatment) and **Residual** (after verified treatment). Click a cell to filter the register. In the inherent view, drag a risk chip to another cell to re-score it.
+- **KPI tiles and legend:** click Critical or High (or a legend chip) to filter the register by rating.
+- **Risk exposure trend:** total inherent vs residual score over the session. Hover for the change behind each point.
+- **Risk register:** change likelihood or impact and every score, rating and count updates live. Pick a treatment option (Mitigate, Transfer, Avoid, Accept, after ISO/IEC 27005). Search, edit or remove risks; removing a risk also removes its linked actions.
+- **Add risk:** set inherent likelihood and impact, a treatment option, a target residual score and an optional first remediation action.
+- **Remediation tracker:** add or remove actions, filter by status and move actions through Not started, In progress, Done and Verified. A risk counts as treated, and its residual score applies, only when all its linked actions are verified. Hover a register row to highlight its actions.
 - **Audit phase bar:** step through the five audit phases.
 - **Activity log:** every change is timestamped as an audit trail.
-- **Reset demo data:** click twice to restore the original sample data.
+- **Undo:** the Undo button or Ctrl+Z reverts the last change.
+- **Export CSV / Print report:** download the register or print the whole dashboard.
+- **Theme:** cycle Auto, Light and Dark.
+- **Reset demo data:** click twice to restore the original sample data (this can also be undone).
+
+Changes are saved in the browser and stay in sync across open tabs, so a presenter tab and a projector tab show the same state.
+
+Keyboard: `/` jumps to search, `Esc` closes a form or clears filters, `Ctrl+Z` undoes.
 
 To run it locally, open `index.html` in a browser, or run `python -m http.server 8000` in this folder and visit http://localhost:8000/.
 
